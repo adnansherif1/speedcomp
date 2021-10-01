@@ -8,6 +8,7 @@
 config=$1
 
 echo $(scontrol show hostnames $SLURM_JOB_NODELIST)
+export PATH=/data/ethanbmehta/miniconda3/bin:$PATH
 source ~/.bashrc
 conda activate graph-aug
 

@@ -34,7 +34,7 @@ def main():
     parser.add_argument('--wandb_run_idx', type=str, default=None)
 
 
-    parser.add_argument('--data_root', type=str, default='/data/zhwu/ogb')
+    parser.add_argument('--data_root', type=str, default='/data/ethanbmehta/ogb')
     parser.add_argument('--dataset', type=str, default="ogbg-code",
                         help='dataset name (default: ogbg-code)')
 
@@ -266,6 +266,7 @@ def main():
         best_test_perf = eval(model, device, test_loader, evaluator)
         return best_valid_perf[dataset.eval_metric], best_test_perf[dataset.eval_metric]
 
+    print(args)
     vals, tests = [], []
     for run_id in range(args.runs):
         best_val, final_test = run(run_id)

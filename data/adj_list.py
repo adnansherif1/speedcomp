@@ -16,7 +16,7 @@ def make_adj_list(N, edge_index_transposed):
 
 
 def make_adj_list_wrapper(x):
-    return make_adj_list(x["num_nodes"], x["edge_index"].T)
+    return make_adj_list(x.num_nodes, x["edge_index"].T)
 
 
 def compute_adjacency_list(data):
@@ -34,7 +34,7 @@ def combine_results(data, adj_list):
     return out_data
 
 
-def compute_adjacency_list_cached(data, key, root="/data/zhwu/tmp"):
+def compute_adjacency_list_cached(data, key, root="/data/ethanbmehta/tmp"):
     cachefile = f"{root}/OGB_ADJLIST_{key}.pickle"
     if os.path.exists(cachefile):
         with open(cachefile, "rb") as cachehandle:
