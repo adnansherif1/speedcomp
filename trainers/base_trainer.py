@@ -26,7 +26,10 @@ class BaseTrainer:
                 pass
             else:
                 optimizer.zero_grad()
+                # print("Batch shape in trainer: ", batch.x.shape, batch.y.shape)
                 pred_list = model(batch)
+                # print("Batch shape in trainer after model: ", batch.x.shape, batch.y.shape)
+                # print("Pred List shape in trainer: ", pred_list.shape)
 
                 loss = calc_loss(pred_list, batch)
 
