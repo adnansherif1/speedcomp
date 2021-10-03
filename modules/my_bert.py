@@ -11,7 +11,21 @@ class MyBertModel(BertModel):
         self.cls_embedding = None
         if True:
             self.cls_embedding = nn.Parameter(torch.randn([1, 1, 768], requires_grad=True))
-    
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+   
+    @staticmethod
+    def add_args(parser):
+        group = parser.add_argument_group("bert")
+        group.add_argument("--d_model", type=int, default=128, help="transformer d_model.")
+        group.add_argument("--nhead", type=int, default=4, help="transformer heads")
+        group.add_argument("--dim_feedforward", type=int, default=512, help="transformer feedforward dim")
+        group.add_argument("--transformer_dropout", type=float, default=0.3)
+        group.add_argument("--transformer_activation", type=str, default="relu")
+        group.add_argument("--num_encoder_layers", type=int, default=4)
+        group.add_argument("--max_input_len", default=1000, help="The max input length of transformer input")
+        group.add_argument("--transformer_norm_input", action="store_true", default=False)
+
     def forward(
         self,
         gnn_outputs=None,
@@ -115,13 +129,15 @@ class MyBertModel(BertModel):
         # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
         head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids,
-            inputs_embeds=inputs_embeds,
-            past_key_values_length=past_key_values_length,
-        )
+        embeddings = self.LayerNorm(inputs_embeds)
+        embedding_output = self.dropout(embeddings)
+        # embedding_output = self.embeddings(
+        #     input_ids=input_ids,
+        #     position_ids=position_ids,
+        #     token_type_ids=token_type_ids,
+        #     inputs_embeds=inputs_embeds,
+        #     past_key_values_length=past_key_values_length,
+        # )
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask=extended_attention_mask,
@@ -134,6 +150,20 @@ class MyBertModel(BertModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+        # print("dfasd", encoder_outputs.shape)
+        print("Sdsfsd", input_ids,
+        attention_mask,
+        token_type_ids,
+        position_ids,
+        head_mask,
+        encoder_hidden_states,
+        encoder_attention_mask,
+        past_key_values,
+        use_cache,
+        output_attentions,
+        output_hidden_states,
+        return_dict)
+
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
 

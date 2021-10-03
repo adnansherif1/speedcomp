@@ -8,8 +8,8 @@ from transformers import BertConfig
 import math
 from modules.gnn_module import GNNNodeEmbedding
 from modules.my_bert import MyBertModel
-from modules.masked_transformer_encoder import MaskedOnlyTransformerEncoder
-from modules.transformer_encoder import TransformerNodeEncoder
+# from modules.masked_transformer_encoder import MaskedOnlyTransformerEncoder
+# from modules.transformer_encoder import TransformerNodeEncoder
 from modules.utils import pad_batch
 
 from .base_model import BaseModel
@@ -21,9 +21,10 @@ class GNNBert(BaseModel):
         return args.gnn_emb_dim
 
     def add_args(parser):
-        TransformerNodeEncoder.add_args(parser)
-        MaskedOnlyTransformerEncoder.add_args(parser)
-        group = parser.add_argument_group("GNNTransformer - Training Config")
+        # TransformerNodeEncoder.add_args(parser)
+        # MaskedOnlyTransformerEncoder.add_args(parser)
+        MyBertModel.add_args(parser)
+        group = parser.add_argument_group("GNNBert - Training Config")
         group.add_argument("--pos_encoder", default=False, action='store_true')
         group.add_argument("--pretrained_gnn", type=str, default=None, help="pretrained gnn_node node embedding path")
         group.add_argument("--freeze_gnn", type=int, default=None, help="Freeze gnn_node weight from epoch `freeze_gnn`")
@@ -36,14 +37,14 @@ class GNNBert(BaseModel):
         name += "-virtual" if args.gnn_virtual_node else ""
         name += f"-JK={args.gnn_JK}"
         name += f"-enc_layer={args.num_encoder_layers}"
-        name += f"-enc_layer_masked={args.num_encoder_layers_masked}"
+        # name += f"-enc_layer_masked={args.num_encoder_layers_masked}"
         name += f"-d={args.d_model}"
         name += f"-act={args.transformer_activation}"
         name += f"-tdrop={args.transformer_dropout}"
         name += f"-gdrop={args.gnn_dropout}"
         name += "-pretrained_gnn" if args.pretrained_gnn else ""
         name += f"-freeze_gnn={args.freeze_gnn}" if args.freeze_gnn is not None else ""
-        name += "-prenorm" if args.transformer_prenorm else "-postnorm"
+        # name += "-prenorm" if args.transformer_prenorm else "-postnorm"
         return name
 
     def __init__(self, num_tasks, node_encoder, edge_encoder_cls, args):
@@ -125,6 +126,7 @@ class GNNBert(BaseModel):
         #     h_graph = transformer_out.sum(0) / src_padding_mask.sum(-1, keepdim=True)
         # else:
         #     raise NotImplementedError
+    
         h_graph = bert_out.pooler_output # CLS
 
         if self.max_seq_len is None:
