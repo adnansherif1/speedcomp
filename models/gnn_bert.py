@@ -80,6 +80,9 @@ class GNNBert(BaseModel):
         self.my_bert_config = BertConfig()
         self.my_bert_model = MyBertModel(self.my_bert_config).from_pretrained(self.checkpoint)
 
+        if True:
+            self.cls_embedding = nn.Parameter(torch.randn([1, 1, 768], requires_grad=True))
+
         self.num_tasks = num_tasks
         self.pooling = args.graph_pooling
         self.graph_pred_linear_list = torch.nn.ModuleList()
@@ -93,6 +96,8 @@ class GNNBert(BaseModel):
         else:
             for i in range(args.max_seq_len):
                 self.graph_pred_linear_list.append(torch.nn.Linear(output_dim, self.num_tasks))
+        self.softm = nn.LogSoftmax(dim=1)
+
 
     def forward(self, batched_data, perturb=None):
         h_node = self.gnn_node(batched_data, perturb)
@@ -118,7 +123,12 @@ class GNNBert(BaseModel):
         # if self.num_encoder_layers > 0:
         #     transformer_out, _ = self.transformer_encoder(transformer_out, src_padding_mask)  # [s, b, h], [b, s]
         
-        bert_out = self.my_bert_model(gnn_outputs=padded_h_node) # With CLS at the end
+        # bert_out = self.my_bert_model(gnn_outputs=padded_h_node) # With CLS at the end
+       
+        if self.cls_embedding is not None:
+            expand_cls_embedding = self.cls_embedding.expand(1, padded_h_node.size(1), -1)
+            padded_h_node = torch.cat([expand_cls_embedding, padded_h_node], dim=0)
+        bert_out = self.my_bert_model(inputs_embeds=padded_h_node.permute(1,0,2)) # With CLS at the end gnn_outputs
 
         # if self.pooling in ["last", "cls"]:
         #     h_graph = transformer_out[-1]
@@ -130,9 +140,11 @@ class GNNBert(BaseModel):
         h_graph = bert_out.pooler_output # CLS
 
         if self.max_seq_len is None:
-            out = self.graph_pred_linear(h_graph)
-            out = self.graph_pred_linear2(out)
+            # out = self.graph_pred_linear(h_graph)
+            out = self.graph_pred_linear2(h_graph)
+            out = self.softm(out)
             return out
+            
         pred_list = []
         for i in range(self.max_seq_len):
             pred_list.append(self.graph_pred_linear_list[i](h_graph))
