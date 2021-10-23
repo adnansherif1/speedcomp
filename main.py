@@ -31,6 +31,7 @@ def main():
     parser = configargparse.ArgumentParser(allow_abbrev=False,
                                     description='GNN baselines on ogbg-code data with Pytorch Geometrics')
     parser.add_argument('--configs', required=False, is_config_file=True)
+    parser.add_argument('--checkpoint', type=str, default=None)
     parser.add_argument('--wandb_run_idx', type=str, default=None)
 
 

@@ -75,8 +75,9 @@ class GNNBert(BaseModel):
         # self.masked_transformer_encoder = MaskedOnlyTransformerEncoder(args)
         # self.num_encoder_layers = args.num_encoder_layers
         # self.num_encoder_layers_masked = args.num_encoder_layers_masked
-        
-        self.checkpoint = "bert-base-uncased" # TODO(Ethan) Add to config file
+        print("Checkpoint is: ", args.checkpoint)
+        print("LR is ", args.lr)
+        self.checkpoint = args.checkpoint # TODO(Ethan) Add to config file
         self.my_bert_config = BertConfig()
         self.my_bert_model = MyBertModel(self.my_bert_config).from_pretrained(self.checkpoint)
 
