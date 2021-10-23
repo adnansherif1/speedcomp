@@ -28,7 +28,8 @@ class GNNBert(BaseModel):
         group.add_argument("--pos_encoder", default=False, action='store_true')
         group.add_argument("--pretrained_gnn", type=str, default=None, help="pretrained gnn_node node embedding path")
         group.add_argument("--freeze_gnn", type=int, default=None, help="Freeze gnn_node weight from epoch `freeze_gnn`")
-
+        group.add_argument("--freeze_bert", type=bool, default=False, help="Freeze bert from start")
+    
     @staticmethod
     def name(args):
         name = f"{args.model_type}-pooling={args.graph_pooling}"
@@ -158,6 +159,16 @@ class GNNBert(BaseModel):
             logger.info(f"Freeze GNN weight after epoch: {epoch}")
             for param in self.gnn_node.parameters():
                 param.requires_grad = False
+
+    def freeze_bert(self):
+        if self.freeze_bert is not None:
+            logger.info(f"Freeze BERT before fine-tuning.")
+
+            for param in self.my_bert_model.parameters():
+                param.requires_grad = False
+            
+            bert_total_params = sum(p.numel() for p in self.my_bert_model.parameters() if p.requires_grad)
+            logger.info(f"All BERT Parameters are frozen: {bert_total_params == 0}")
 
     def _gnn_node_state(self, state_dict):
         module_name = "gnn_node"
