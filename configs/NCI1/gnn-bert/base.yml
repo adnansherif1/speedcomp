@@ -28,4 +28,4 @@ gnn_dropout: 0.1
 batch_size: 64
 
 data_tmp: "/data/ethanbmehta/tmp"
-data_root: "data/ethanbmehta/ogb"
+data_root: "/data/ethanbmehta/ogb"
