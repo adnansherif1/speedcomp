@@ -86,19 +86,16 @@ class GNNTransformer(BaseModel):
         else:
             for i in range(args.max_seq_len):
                 self.graph_pred_linear_list.append(torch.nn.Linear(output_dim, self.num_tasks))
+        # if args.dataset == ... TODO
+        self.softm = nn.LogSoftmax(dim=1) # Only for NCI1
 
     def forward(self, batched_data, perturb=None):
-        print("Forward (Start): ", batched_data) # 4130, 4130
         h_node = self.gnn_node(batched_data, perturb) 
-        print("Forward (After GNN): ", h_node) # 4130, 128 
         h_node = self.gnn2transformer(h_node)  # [s, b, d_model]
-        print("Forward (After GNN2Transformer): ", h_node) # 4130, 128 
 
         padded_h_node, src_padding_mask, num_nodes, mask, max_num_nodes = pad_batch(
             h_node, batched_data.batch, self.transformer_encoder.max_input_len, get_mask=True
         )  # Pad in the front
-        
-        print("Forward (After Padding): ", padded_h_node) # 88, 128, 128
 
         # TODO(paras): implement mask
         transformer_out = padded_h_node
@@ -116,7 +113,6 @@ class GNNTransformer(BaseModel):
         if self.num_encoder_layers > 0:
             transformer_out, _ = self.transformer_encoder(transformer_out, src_padding_mask)  # [s, b, h], [b, s]
 
-        print(self.pooling)
         if self.pooling in ["last", "cls"]:
             h_graph = transformer_out[-1]
         elif self.pooling == "mean":
@@ -126,7 +122,7 @@ class GNNTransformer(BaseModel):
 
         if self.max_seq_len is None:
             out = self.graph_pred_linear(h_graph)
-            print("Forward (After Transformer): ", out.shape)
+            out=self.softm(out) # For NCI1 only TODO
             return out
         pred_list = []
         for i in range(self.max_seq_len):

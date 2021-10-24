@@ -35,7 +35,9 @@ def main():
     parser.add_argument('--wandb_run_idx', type=str, default=None)
 
 
-    parser.add_argument('--data_root', type=str, default='/data/ethanbmehta/ogb')
+    parser.add_argument('--data_tmp', type=str, default=None)
+    parser.add_argument('--data_root', type=str, default=None)
+
     parser.add_argument('--dataset', type=str, default="ogbg-code",
                         help='dataset name (default: ogbg-code)')
 
@@ -77,8 +79,8 @@ def main():
     group.add_argument('--lr', type=float, default=0.001)
     group.add_argument('--max_lr', type=float, default=0.001)
     group.add_argument('--runs', type=int, default=10)
-    group.add_argument('--test-freq', type=int, default=1)
-    group.add_argument('--start-eval', type=int, default=15)
+    group.add_argument('--test-freq', type=int, default=3) # Every x runs do an eval
+    group.add_argument('--start-eval', type=int, default=2) # Start evaluating in epoch x
     group.add_argument('--resume', type=str, default=None)
     group.add_argument('--seed', type=int, default=None)
     # fmt: on
@@ -141,9 +143,9 @@ def main():
     eval = dataset_util.eval
 
     def create_loader(dataset, dataset_eval):
-        test_data = compute_adjacency_list_cached(dataset[split_idx["test"]], key=f"{args.dataset}_test")
-        valid_data = compute_adjacency_list_cached(dataset_eval[split_idx["valid"]], key=f"{args.dataset}_valid")
-        train_data = compute_adjacency_list_cached(dataset[split_idx["train"]], key=f"{args.dataset}_train")
+        test_data = compute_adjacency_list_cached(dataset[split_idx["test"]], key=f"{args.dataset}_test", root=args.data_tmp)
+        valid_data = compute_adjacency_list_cached(dataset_eval[split_idx["valid"]], key=f"{args.dataset}_valid", root=args.data_tmp)
+        train_data = compute_adjacency_list_cached(dataset[split_idx["train"]], key=f"{args.dataset}_train", root=args.data_tmp)
         logger.debug("Finished computing adjacency list")
 
         eval_bs = args.batch_size if args.eval_batch_size is None else args.eval_batch_size

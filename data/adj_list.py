@@ -34,7 +34,7 @@ def combine_results(data, adj_list):
     return out_data
 
 
-def compute_adjacency_list_cached(data, key, root="/data/ethanbmehta/tmp"):
+def compute_adjacency_list_cached(data, key, root):
     cachefile = f"{root}/OGB_ADJLIST_{key}.pickle"
     if os.path.exists(cachefile):
         with open(cachefile, "rb") as cachehandle:
