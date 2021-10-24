@@ -210,6 +210,7 @@ def main():
 
         model.epoch_callback(epoch=start_epoch - 1)
         model.freeze_bert()
+        
         for epoch in range(start_epoch, args.epochs + 1):
             logger.info(f"=====Epoch {epoch}=====")
             logger.info("Training...")
