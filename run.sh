@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=10
-#SBATCH --nodelist=zanino
+#SBATCH --nodelist=como
 
 config=$1
 seed=$2

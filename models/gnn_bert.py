@@ -28,7 +28,8 @@ class GNNBert(BaseModel):
         group.add_argument("--pos_encoder", default=False, action='store_true')
         group.add_argument("--pretrained_gnn", type=str, default=None, help="pretrained gnn_node node embedding path")
         group.add_argument("--freeze_gnn", type=int, default=None, help="Freeze gnn_node weight from epoch `freeze_gnn`")
-        group.add_argument("--freeze_bert", type=bool, default=False, help="Freeze bert from start")
+        group.add_argument("--freeze_bert", type=int, default=None, help="Freeze my_bert from epoch `freeze_bert")
+        group.add_argument("--unfreeze_bert", type=int, default=None, help="Unfreeze my_bert from epoch `unfreeze_bert")
     
     @staticmethod
     def name(args):
@@ -45,6 +46,8 @@ class GNNBert(BaseModel):
         name += f"-gdrop={args.gnn_dropout}"
         name += "-pretrained_gnn" if args.pretrained_gnn else ""
         name += f"-freeze_gnn={args.freeze_gnn}" if args.freeze_gnn is not None else ""
+        name += f"-freeze_bert={args.freeze_bert}" if args.freeze_bert is not None else ""
+        name += f"-unfreeze_bert={args.unfreeze_bert}" if args.unfreeze_bert is not None else ""
         # name += "-prenorm" if args.transformer_prenorm else "-postnorm"
         return name
 
@@ -67,8 +70,11 @@ class GNNBert(BaseModel):
             state_dict = self._gnn_node_state(state_dict["model"])
             logger.info("Load GNN state from: {}", state_dict.keys())
             self.gnn_node.load_state_dict(state_dict)
-        self.freeze_gnn = args.freeze_gnn
 
+        self.freeze_gnn = args.freeze_gnn
+        self.freeze_bert = args.freeze_bert
+        self.unfreeze_bert = args.unfreeze_bert
+        
         gnn_emb_dim = 2 * args.gnn_emb_dim if args.gnn_JK == "cat" else args.gnn_emb_dim
         self.gnn2transformer = nn.Linear(gnn_emb_dim, args.d_model)
         # self.pos_encoder = PositionalEncoding(args.d_model, dropout=0) if args.pos_encoder else None
@@ -156,21 +162,22 @@ class GNNBert(BaseModel):
 
     def epoch_callback(self, epoch):
         # TODO: maybe unfreeze the gnn at the end.
-        if self.freeze_gnn is not None and epoch >= self.freeze_gnn:
+        if self.freeze_gnn is not None and epoch >= self.freeze_gnn: # TODO Ask Paras whether this should be >= or ==
             logger.info(f"Freeze GNN weight after epoch: {epoch}")
             for param in self.gnn_node.parameters():
                 param.requires_grad = False
 
-    def freeze_bert(self):
-        if self.freeze_bert is not None:
-            logger.info(f"Freeze BERT before fine-tuning.")
-
+        if self.freeze_bert is not None and epoch == self.freeze_bert:
+            logger.info(f"Freeze BERT weight after epoch: {epoch} ")
             for param in self.my_bert_model.parameters():
                 param.requires_grad = False
-            
-            bert_total_params = sum(p.numel() for p in self.my_bert_model.parameters() if p.requires_grad)
-            logger.info(f"All BERT Parameters are frozen: {bert_total_params == 0}")
 
+        if self.unfreeze_bert is not None and epoch == self.unfreeze_bert:
+            logger.info(f"Unfreeze BERT weight after epoch: {epoch} ")
+            for param in self.my_bert_model.parameters():
+                param.requires_grad = True
+        
+            
     def _gnn_node_state(self, state_dict):
         module_name = "gnn_node"
         new_state_dict = dict()
