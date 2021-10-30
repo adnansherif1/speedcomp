@@ -76,7 +76,7 @@ class GNNBert(BaseModel):
         self.unfreeze_bert = args.unfreeze_bert
         
         gnn_emb_dim = 2 * args.gnn_emb_dim if args.gnn_JK == "cat" else args.gnn_emb_dim
-        self.gnn2transformer = nn.Linear(gnn_emb_dim, args.d_model)
+        self.gnn2bert = nn.Linear(gnn_emb_dim, args.d_model)
         # self.pos_encoder = PositionalEncoding(args.d_model, dropout=0) if args.pos_encoder else None
         # self.transformer_encoder = TransformerNodeEncoder(args)
         # self.masked_transformer_encoder = MaskedOnlyTransformerEncoder(args)
@@ -84,7 +84,7 @@ class GNNBert(BaseModel):
         # self.num_encoder_layers_masked = args.num_encoder_layers_masked
         print("Checkpoint is: ", args.checkpoint)
         print("LR is ", args.lr)
-        self.checkpoint = args.checkpoint # TODO(Ethan) Add to config file
+        self.checkpoint = args.checkpoint
         self.my_bert_config = BertConfig()
         self.my_bert_model = MyBertModel(self.my_bert_config).from_pretrained(self.checkpoint)
 
@@ -110,46 +110,21 @@ class GNNBert(BaseModel):
 
     def forward(self, batched_data, perturb=None):
         h_node = self.gnn_node(batched_data, perturb)
-        h_node = self.gnn2transformer(h_node)  # [s, b, d_model]
+        h_node = self.gnn2bert(h_node)  # [s, b, d_model]
 
         padded_h_node, src_padding_mask, num_nodes, mask, max_num_nodes = pad_batch(
             h_node, batched_data.batch, self.my_bert_config.max_position_embeddings, get_mask=True
         )  # Pad in the front
-
-        # TODO(paras): implement mask
-        # transformer_out = padded_h_node
-        # if self.pos_encoder is not None:
-        #     transformer_out = self.pos_encoder(transformer_out)
-        # if self.num_encoder_layers_masked > 0:
-        #     adj_list = batched_data.adj_list
-        #     padded_adj_list = torch.zeros((len(adj_list), max_num_nodes, max_num_nodes), device=h_node.device)
-        #     for idx, adj_list_item in enumerate(adj_list):
-        #         N, _ = adj_list_item.shape
-        #         padded_adj_list[idx, 0:N, 0:N] = torch.from_numpy(adj_list_item)
-        #     transformer_out = self.masked_transformer_encoder(
-        #         transformer_out.transpose(0, 1), attn_mask=padded_adj_list, valid_input_mask=src_padding_mask
-        #     ).transpose(0, 1)
-        # if self.num_encoder_layers > 0:
-        #     transformer_out, _ = self.transformer_encoder(transformer_out, src_padding_mask)  # [s, b, h], [b, s]
-        
-        # bert_out = self.my_bert_model(gnn_outputs=padded_h_node) # With CLS at the end
        
         if self.cls_embedding is not None:
             expand_cls_embedding = self.cls_embedding.expand(1, padded_h_node.size(1), -1)
             padded_h_node = torch.cat([expand_cls_embedding, padded_h_node], dim=0)
+       
         bert_out = self.my_bert_model(inputs_embeds=padded_h_node.permute(1,0,2)) # With CLS at the end gnn_outputs
 
-        # if self.pooling in ["last", "cls"]:
-        #     h_graph = transformer_out[-1]
-        # elif self.pooling == "mean":
-        #     h_graph = transformer_out.sum(0) / src_padding_mask.sum(-1, keepdim=True)
-        # else:
-        #     raise NotImplementedError
-    
         h_graph = bert_out.pooler_output # CLS
 
         if self.max_seq_len is None:
-            # out = self.graph_pred_linear(h_graph)
             out = self.graph_pred_linear2(h_graph)
             out = self.softm(out)
             return out
