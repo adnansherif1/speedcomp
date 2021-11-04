@@ -4,25 +4,27 @@ model_type: gnn-bert
 
 checkpoint: "bert-base-uncased"
 freeze_bert: 0
-unfreeze_bert: 100
+unfreeze_bert: 30
+warmup_epochs: 10
 
 gnn_type: gin
 gnn_virtual_node: false
 
 graph_pooling: cls
 
-# lr: 0.00002
-# seed: 2000
+lr: 0.0001
+# max_lr: 0.0001
+seed: 2000
 
 transformer_norm_input: true
 
 runs: 1
-epochs: 200
+epochs: 100
 
 d_model: 768
 dim_feedforward: 256
 num_encoder_layers: 4
-scheduler: cosine
+scheduler: custom
 
 transformer_dropout: 0.1
 gnn_dropout: 0.1

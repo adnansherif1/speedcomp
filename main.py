@@ -1,5 +1,6 @@
 import os
 import random
+import math
 from datetime import datetime
 
 import configargparse
@@ -11,7 +12,7 @@ import torch.optim as optim
 import wandb
 from loguru import logger
 from ogb.graphproppred import Evaluator, PygGraphPropPredDataset
-from torch.optim.lr_scheduler import CosineAnnealingLR, OneCycleLR, ReduceLROnPlateau
+from torch.optim.lr_scheduler import CosineAnnealingLR, OneCycleLR, ReduceLROnPlateau, LambdaLR
 from torch_geometric.data import DataLoader
 from tqdm import tqdm
 
@@ -83,6 +84,8 @@ def main():
     group.add_argument('--start-eval', type=int, default=2) # Start evaluating in epoch x
     group.add_argument('--resume', type=str, default=None)
     group.add_argument('--seed', type=int, default=None)
+
+    group.add_argument('--warmup_epochs', type=int, default=None)
     # fmt: on
 
     args, _ = parser.parse_known_args()
@@ -178,7 +181,7 @@ def main():
 
         wandb.watch(model)
 
-        optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay) 
         if args.scheduler == "plateau":
             # NOTE(ajayjain): For Molhiv config, this min_lr is too high -- means that lr does not decay.
             scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=20, min_lr=0.0001, verbose=False)
@@ -193,8 +196,28 @@ def main():
                 pct_start=args.pct_start,
                 verbose=False,
             )
+        elif args.scheduler == "custom":
+            
+            def lr_lambda(current_step):
+                num_training_steps = args.epochs * len(train_loader) # total number of training steps
+                num_warmup_steps = args.warmup_epochs * len(train_loader) # number of warmup steps
+                num_fixed_steps = args.unfreeze_bert * len(train_loader) # number of fixed lr steps (for gnn)
+                
+                if current_step < num_fixed_steps:
+                    return 1
+                
+                if current_step < num_warmup_steps + num_fixed_steps and current_step >= num_fixed_steps:
+                    return float(current_step - num_fixed_steps) / (10*float(max(1, num_warmup_steps)))
+                
+                progress = float(current_step - num_warmup_steps - num_fixed_steps) / float(max(1, num_training_steps - num_warmup_steps - num_fixed_steps))
+
+                return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(0.5) * 2.0 * progress)))/10
+
+            scheduler = LambdaLR(optimizer, lr_lambda, last_epoch=-1)
+            
         elif args.scheduler is None:
             scheduler = None
+
         else:
             raise NotImplementedError
 
@@ -220,6 +243,7 @@ def main():
             loss = train(model, device, train_loader, optimizer, args, calc_loss, scheduler if args.scheduler != "plateau" else None)
 
             model.epoch_callback(epoch)
+            
             wandb.log({f"train/loss-runs{run_id}": loss, f"train/lr": optimizer.param_groups[0]["lr"], f"epoch": epoch})
 
             if args.scheduler == "plateau":

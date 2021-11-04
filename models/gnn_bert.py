@@ -151,7 +151,6 @@ class GNNBert(BaseModel):
             logger.info(f"Unfreeze BERT weight after epoch: {epoch} ")
             for param in self.my_bert_model.parameters():
                 param.requires_grad = True
-        
             
     def _gnn_node_state(self, state_dict):
         module_name = "gnn_node"
