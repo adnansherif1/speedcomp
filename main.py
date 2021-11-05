@@ -207,11 +207,11 @@ def main():
                     return 1
                 
                 if current_step < num_warmup_steps + num_fixed_steps and current_step >= num_fixed_steps:
-                    return float(current_step - num_fixed_steps) / (10*float(max(1, num_warmup_steps)))
+                    return float(current_step - num_fixed_steps) / (float(max(1, num_warmup_steps)))
                 
                 progress = float(current_step - num_warmup_steps - num_fixed_steps) / float(max(1, num_training_steps - num_warmup_steps - num_fixed_steps))
 
-                return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(0.5) * 2.0 * progress)))/10
+                return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(0.5) * 2.0 * progress)))
 
             scheduler = LambdaLR(optimizer, lr_lambda, last_epoch=-1)
             
