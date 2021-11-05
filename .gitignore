@@ -1,4 +1,5 @@
 slurm*.out
+slurm_out_files/
 data/ethanbmehta/
 
 # Byte-compiled / optimized / DLL files
