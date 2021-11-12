@@ -69,14 +69,18 @@ def get_vocab_mapping(seq_list, num_vocab):
     # logger.info([vocab_list[v] for v in topvocab[:10]])
     # logger.info([vocab_list[v] for v in topvocab[-10:]])
 
-    vocab2idx["__UNK__"] = num_vocab
+    #Changed this line from  ""= num_vocab"
+    # vocab2idx["__UNK__"] = num_vocab
+    vocab2idx["__UNK__"] = len(vocab2idx)
     idx2vocab.append("__UNK__")
 
-    vocab2idx["__EOS__"] = num_vocab + 1
+    # vocab2idx["__EOS__"] = num_vocab + 1
+    vocab2idx["__EOS__"] = len(vocab2idx)
     idx2vocab.append("__EOS__")
 
     # test the correspondence between vocab2idx and idx2vocab
     for idx, vocab in enumerate(idx2vocab):
+        # print(idx, vocab, vocab2idx[vocab])
         assert idx == vocab2idx[vocab]
 
     # test that the idx of '__EOS__' is len(idx2vocab) - 1.

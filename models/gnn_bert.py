@@ -104,9 +104,8 @@ class GNNBert(BaseModel):
         else:
             for i in range(args.max_seq_len):
                 self.graph_pred_linear_list.append(torch.nn.Linear(output_dim, self.num_tasks))
-        
-        self.softm = nn.LogSoftmax(dim=1)
-
+       
+        self.softm = nn.LogSoftmax(dim=1) #Added to NCI1 loss
 
     def forward(self, batched_data, perturb=None):
         h_node = self.gnn_node(batched_data, perturb)
@@ -120,13 +119,16 @@ class GNNBert(BaseModel):
             expand_cls_embedding = self.cls_embedding.expand(1, padded_h_node.size(1), -1)
             padded_h_node = torch.cat([expand_cls_embedding, padded_h_node], dim=0)
        
-        bert_out = self.my_bert_model(inputs_embeds=padded_h_node.permute(1,0,2)) # With CLS at the end gnn_outputs
+        print("Padded Node Shape: ", padded_h_node.shape)
+        inputs_embeds=padded_h_node.permute(1,0,2)
+        print("Input Embeds Shape: ", inputs_embeds.shape)
+        bert_out = self.my_bert_model(inputs_embeds=inputs_embeds) # With CLS at the end gnn_outputs
 
         h_graph = bert_out.pooler_output # CLS
 
         if self.max_seq_len is None:
             out = self.graph_pred_linear2(h_graph)
-            out = self.softm(out)
+            # out = self.softm(out) # Added to NCI1 loss
             return out
             
         pred_list = []

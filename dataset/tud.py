@@ -24,6 +24,7 @@ class TUUtil:
     def loss_fn(task_type):
         def calc_loss(pred, batch, m=1.0):
             loss = F.nll_loss(pred, batch.y)
+            # loss = nn.LogSoftmax(dim=1)(loss) # changed to fix loss function for tud
             return loss
 
         return calc_loss
