@@ -15,5 +15,5 @@ seed: 2000
 
 transformer_norm_input: true
 
-data_root: "/data/ethanbmehta/ogb"
-data_tmp: "/data/ethanbmehta/tmp"
+data_root: "/data/adnans/ogb"
+data_tmp: "/data/adnans/tmp"

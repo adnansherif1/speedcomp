@@ -86,8 +86,11 @@ class CodeUtil:
         )
 
         # building vocabulary for sequence predition. Only use training data.
-        # print(len(dataset.data.y[0]))
-        # print(len(split_idx["train"])), debugging line 91 
+        print(len(dataset.data.y))
+        print(type(dataset.data.y))
+        print(len(split_idx["train"])) #, debugging line 91 
+        #print(dataset.data.y)
+        #print(dataset.data.y[0][1])
         vocab2idx, idx2vocab = get_vocab_mapping([dataset.data.y[0][i] for i in split_idx["train"]], args.num_vocab)
 
         self.arr_to_seq = lambda arr: decode_arr_to_seq(arr, idx2vocab)

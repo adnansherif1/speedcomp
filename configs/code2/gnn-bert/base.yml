@@ -28,6 +28,6 @@ scheduler: custom
 transformer_dropout: 0.1
 gnn_dropout: 0.1
 
-data_root: "/data/ethanbmehta/ogb"
-data_tmp: "/data/ethanbmehta/tmp"
+data_root: "/data/adnans/ogb"
+data_tmp: "/data/adnans/tmp"
 
