@@ -34,7 +34,7 @@ def main():
     parser.add_argument('--wandb_run_idx', type=str, default=None)
 
 
-    parser.add_argument('--data_root', type=str, default='/data/zhwu/ogb')
+    parser.add_argument('--data_root', type=str, default='/data/adnans/ogb')
     parser.add_argument('--dataset', type=str, default="ogbg-code",
                         help='dataset name (default: ogbg-code)')
 
