@@ -86,7 +86,11 @@ class GNNBert(BaseModel):
         print("LR is ", args.lr)
         self.checkpoint = args.checkpoint
         self.my_bert_config = BertConfig()
-        self.my_bert_model = MyBertModel(self.my_bert_config).from_pretrained(self.checkpoint)
+        if self.checkpoint:
+            self.my_bert_model = MyBertModel(self.my_bert_config).from_pretrained(self.checkpoint)
+        else:
+            self.my_bert_model = MyBertModel(self.my_bert_config)
+            print("using untrained bert")
 
         if True:
             self.cls_embedding = nn.Parameter(torch.randn([1, 1, 768], requires_grad=True))
@@ -119,9 +123,9 @@ class GNNBert(BaseModel):
             expand_cls_embedding = self.cls_embedding.expand(1, padded_h_node.size(1), -1)
             padded_h_node = torch.cat([expand_cls_embedding, padded_h_node], dim=0)
        
-        print("Padded Node Shape: ", padded_h_node.shape)
+        # print("Padded Node Shape: ", padded_h_node.shape)
         inputs_embeds=padded_h_node.permute(1,0,2)
-        print("Input Embeds Shape: ", inputs_embeds.shape)
+        # print("Input Embeds Shape: ", inputs_embeds.shape)
         bert_out = self.my_bert_model(inputs_embeds=inputs_embeds) # With CLS at the end gnn_outputs
 
         h_graph = bert_out.pooler_output # CLS

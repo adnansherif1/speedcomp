@@ -2,28 +2,29 @@ dataset: ogbg-code2
 aug: baseline
 model_type: gnn-bert
 
-checkpoint: bert-base-uncased
-freeze_bert: 0
-unfreeze_bert: 30
-warmup_epochs: 30
-
-gnn_type: gin
-gnn_virtual_node: false
+gnn_type: gcn
+gnn_virtual_node: true
 
 graph_pooling: cls
 
 batch_size: 16
-lr: 0.0001
+lr: 0.00003
 
 runs: 1
-seed: 2000
+seed: 1000
 
 transformer_norm_input: true
+gnn_JK: cat
+
+checkpoint: bert-base-uncased
+# freeze_bert: 0
+# unfreeze_bert: 30
+# warmup_epochs: 30
 
 d_model: 768
 dim_feedforward: 256
 num_encoder_layers: 4
-scheduler: custom
+# scheduler: custom
 
 transformer_dropout: 0.1
 gnn_dropout: 0.1

@@ -89,17 +89,17 @@ class MyBertModel(BertModel):
         if attention_mask is None:
             attention_mask = torch.ones(((batch_size, seq_length + past_key_values_length)), device=device)
 
-        if token_type_ids is None:
-            print("Embeddings: ", self.embeddings)
-            if hasattr(self.embeddings, "token_type_ids"):
-                buffered_token_type_ids = self.embeddings.token_type_ids[:, :seq_length]
-                print("Buffered Token Type Ids Size: ", buffered_token_type_ids.size()) # Size mismatch issue with expand
-                print("Sequence Length: ", seq_length)
-                print("Batch Size: ", batch_size)
-                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(batch_size, seq_length)
-                token_type_ids = buffered_token_type_ids_expanded
-            else:
-                token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=device)
+        # if token_type_ids is None:
+        #     print("Embeddings: ", self.embeddings)
+        #     if hasattr(self.embeddings, "token_type_ids"):
+        #         buffered_token_type_ids = self.embeddings.token_type_ids[:, :seq_length]
+        #         print("Buffered Token Type Ids Size: ", buffered_token_type_ids.size()) # Size mismatch issue with expand
+        #         print("Sequence Length: ", seq_length)
+        #         print("Batch Size: ", batch_size)
+        #         buffered_token_type_ids_expanded = buffered_token_type_ids.expand(batch_size, seq_length)
+        #         token_type_ids = buffered_token_type_ids_expanded
+        #     else:
+        token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=device)
 
         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.

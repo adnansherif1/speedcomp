@@ -15,3 +15,5 @@ seed: 12344
 
 transformer_norm_input: true
 gnn_JK: cat
+data_root: "/data/adnans/ogb"
+data_tmp: "/data/adnans/tmp"

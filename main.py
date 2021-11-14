@@ -150,7 +150,24 @@ def main():
         valid_data = compute_adjacency_list_cached(dataset_eval[split_idx["valid"]], key=f"{args.dataset}_valid", root=args.data_tmp)
         train_data = compute_adjacency_list_cached(dataset[split_idx["train"]], key=f"{args.dataset}_train", root=args.data_tmp)
         logger.debug("Finished computing adjacency list")
+        # test_data = dataset[split_idx["test"][:5000]]
+        # valid_data = dataset_eval[split_idx["valid"][:5000]]
+        # train_data = dataset[split_idx["train"][:1000]]
+        # logger.debug("Finished computing adjacency list")
 
+        # print("train set length" , len(train_data))
+        # print("half train data", len(train_data[:int(len(train_data)/2)]))
+        # print(vars(valid_data))
+        # maximum = ""
+        # print("ylength", len(valid_data.data.y))
+        # for i in valid_data.data.y[0]:
+        #     if len(i.split(" ")) > 1:
+        #         print(i)
+        # print("maximum" , maximum)
+        # for i in valid_data.data.y:
+        #     print("len",len(i))
+        # # if 1:
+        # #     return
         eval_bs = args.batch_size if args.eval_batch_size is None else args.eval_batch_size
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
         train_loader_eval = DataLoader(train_data, batch_size=eval_bs, shuffle=False, num_workers=args.num_workers, pin_memory=True)
@@ -171,7 +188,7 @@ def main():
             train_loader, train_loader_eval, valid_loader, test_loader = train_loader_, train_loader_eval_, valid_loader_, test_loader_
             dataset = dataset_
         node_encoder = node_encoder_cls()
-
+        print("training loader length" , len(train_loader))
         os.makedirs(os.path.join(args.save_path, str(run_id)), exist_ok=True)
         best_val, final_test = 0, 0
         model = model_cls(num_tasks=num_tasks, args=args, node_encoder=node_encoder, edge_encoder_cls=edge_encoder_cls).to(device)

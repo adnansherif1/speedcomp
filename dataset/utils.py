@@ -71,7 +71,7 @@ def get_vocab_mapping(seq_list, num_vocab):
 
     #Changed this line from  ""= num_vocab"
     print(num_vocab)
-    print(vocab2idx)
+    print(len(vocab2idx))
     vocab2idx["__UNK__"] = num_vocab
     #vocab2idx["__UNK__"] = len(vocab2idx)
     idx2vocab.append("__UNK__")

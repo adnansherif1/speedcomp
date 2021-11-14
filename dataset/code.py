@@ -67,18 +67,28 @@ class CodeUtil:
                 seq_pred = [self.arr_to_seq(arr) for arr in mat]
 
                 # PyG >= 1.5.0
-                seq_ref = [batch.y[i] for i in range(len(batch.y))]
+                seq_ref = [[batch.y[0][i]] for i in range(len(batch.y[0]))]
 
                 seq_ref_list.extend(seq_ref)
                 seq_pred_list.extend(seq_pred)
-
+                # print(batch.y)
+                # print(batch.x)
+                # print("pred_list", pred_list)
+                # print("mat",mat)
+                # print("seq+pred",seq_pred)
+                # print()
+                # break
+                
+        # print("seq_ref", len(seq_ref_list))
+        # print("seq_pred", len(seq_pred_list))      
+        # print("length of loader",len(loader))
         input_dict = {"seq_ref": seq_ref_list, "seq_pred": seq_pred_list}
 
         return evaluator.eval(input_dict)
 
     def preprocess(self, dataset, dataset_eval, model_cls, args):
         split_idx = dataset.get_idx_split()
-        seq_len_list = np.array([len(seq) for seq in dataset.data.y])
+        seq_len_list = np.array([len(seq) for seq in dataset.data.y[0]])
         print(
             "Target seqence less or equal to {} is {}%.".format(
                 args.max_seq_len, np.sum(seq_len_list <= args.max_seq_len) / len(seq_len_list)
@@ -91,7 +101,7 @@ class CodeUtil:
         print(len(split_idx["train"])) #, debugging line 91 
         #print(dataset.data.y)
         #print(dataset.data.y[0][1])
-        vocab2idx, idx2vocab = get_vocab_mapping([dataset.data.y[0][i] for i in split_idx["train"]], args.num_vocab)
+        vocab2idx, idx2vocab = get_vocab_mapping([[dataset.data.y[0][i]] for i in split_idx["train"]], args.num_vocab)
 
         self.arr_to_seq = lambda arr: decode_arr_to_seq(arr, idx2vocab)
 
