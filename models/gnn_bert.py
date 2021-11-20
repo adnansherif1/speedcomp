@@ -109,8 +109,7 @@ class GNNBert(BaseModel):
             for i in range(args.max_seq_len):
                 self.graph_pred_linear_list.append(torch.nn.Linear(output_dim, self.num_tasks))
        
-        self.softm = nn.LogSoftmax(dim=1) #Added to NCI1 loss
-
+        
     def forward(self, batched_data, perturb=None):
         h_node = self.gnn_node(batched_data, perturb)
         h_node = self.gnn2bert(h_node)  # [s, b, d_model]

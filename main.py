@@ -21,8 +21,16 @@ from data.adj_list import compute_adjacency_list_cached
 from dataset import DATASET_UTILS
 from models import get_model_and_parser
 from trainers import get_trainer_and_parser
+import accelerate
+from accelerate import Accelerator
+from dataclasses import dataclass
 
-wandb.init(project="graph-aug")
+kwargs_handlers = [accelerate.DistributedDataParallelKwargs(find_unused_parameters=True)]
+accelerator = Accelerator(kwargs_handlers=kwargs_handlers)
+device = accelerator.device
+
+if accelerator.is_main_process:
+    wandb.init(project="graph-aug")
 now = datetime.now()
 now = now.strftime("%m_%d-%H_%M_%S")
 
@@ -109,16 +117,17 @@ def main():
         run_name = run_name + f"+seed{args.seed}"
     if args.wandb_run_idx is not None:
         run_name = args.wandb_run_idx + "_" + run_name
+    if accelerator.is_main_process:
+        wandb.run.name = run_name
 
-    wandb.run.name = run_name
-
-    device = torch.device("cuda") if torch.cuda.is_available() and args.devices else torch.device("cpu")
+    # device = torch.device("cuda") if torch.cuda.is_available() and args.devices else torch.device("cpu")
     args.save_path = f"exps/{run_name}-{now}"
     os.makedirs(args.save_path, exist_ok=True)
     if args.resume is not None:
         args.save_path = args.resume
-    logger.info(args)
-    wandb.config.update(args)
+    if accelerator.is_main_process:
+        logger.info(args)
+        wandb.config.update(args)
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -146,14 +155,13 @@ def main():
     eval = dataset_util.eval
 
     def create_loader(dataset, dataset_eval):
-        test_data = compute_adjacency_list_cached(dataset[split_idx["test"]], key=f"{args.dataset}_test", root=args.data_tmp)
-        valid_data = compute_adjacency_list_cached(dataset_eval[split_idx["valid"]], key=f"{args.dataset}_valid", root=args.data_tmp)
-        train_data = compute_adjacency_list_cached(dataset[split_idx["train"]], key=f"{args.dataset}_train", root=args.data_tmp)
+        test_data = compute_adjacency_list_cached(dataset[split_idx["test"]], key=f"{args.dataset}_test", root=args.data_tmp,accelerator = accelerator)
+        valid_data = compute_adjacency_list_cached(dataset_eval[split_idx["valid"]], key=f"{args.dataset}_valid", root=args.data_tmp, accelerator= accelerator)
+        train_data = compute_adjacency_list_cached(dataset[split_idx["train"]], key=f"{args.dataset}_train", root=args.data_tmp,accelerator = accelerator)
         logger.debug("Finished computing adjacency list")
         # test_data = dataset[split_idx["test"][:5000]]
         # valid_data = dataset_eval[split_idx["valid"][:5000]]
-        # train_data = dataset[split_idx["train"][:1000]]
-        # logger.debug("Finished computing adjacency list")
+        # train_data = dataset[split_idx["train"][:8000]]
 
         # print("train set length" , len(train_data))
         # print("half train data", len(train_data[:int(len(train_data)/2)]))
@@ -191,14 +199,17 @@ def main():
         print("training loader length" , len(train_loader))
         os.makedirs(os.path.join(args.save_path, str(run_id)), exist_ok=True)
         best_val, final_test = 0, 0
-        model = model_cls(num_tasks=num_tasks, args=args, node_encoder=node_encoder, edge_encoder_cls=edge_encoder_cls).to(device)
+        #model = model_cls(num_tasks=num_tasks, args=args, node_encoder=node_encoder, edge_encoder_cls=edge_encoder_cls).to(device)
+        model = model_cls(num_tasks=num_tasks, args=args, node_encoder=node_encoder, edge_encoder_cls=edge_encoder_cls)
         print("Model Parameters: ", count_parameters(model))
         # exit(-1)
         # model = nn.DataParallel(model)
+        if accelerator.is_main_process:
+            wandb.watch(model)
 
-        wandb.watch(model)
-
-        optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay) 
+        optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        model, optimizer, train_loader = accelerator.prepare(model, optimizer, train_loader)
+        train_loader_eval = accelerator.prepare(train_loader_eval)
         if args.scheduler == "plateau":
             # NOTE(ajayjain): For Molhiv config, this min_lr is too high -- means that lr does not decay.
             scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=20, min_lr=0.0001, verbose=False)
@@ -249,77 +260,93 @@ def main():
             if args.scheduler:
                 scheduler.load_state_dict(state_dict["scheduler"])
             logger.info("[Resume] Loaded: {last_model_path} epoch: {start_epoch}")
-
-        model.epoch_callback(epoch=start_epoch - 1)
+        
+        # if args.model_type == "gnn-bert":
+        #     model.epoch_callback(epoch=start_epoch - 1)
         
         for epoch in range(start_epoch, args.epochs + 1):
-            logger.info(f"=====Epoch {epoch}=====")
-            logger.info("Training...")
-            logger.info("Total parameters: {}", utils.num_total_parameters(model))
-            logger.info("Trainable parameters: {}", utils.num_trainable_parameters(model))
-            loss = train(model, device, train_loader, optimizer, args, calc_loss, scheduler if args.scheduler != "plateau" else None)
-
-            model.epoch_callback(epoch)
-            
-            wandb.log({f"train/loss-runs{run_id}": loss, f"train/lr": optimizer.param_groups[0]["lr"], f"epoch": epoch})
+            if accelerator.is_main_process:
+                logger.info(f"=====Epoch {epoch}=====")
+                logger.info("Training...")
+                logger.info("Total parameters: {}", utils.num_total_parameters(model))
+                logger.info("Trainable parameters: {}", utils.num_trainable_parameters(model))
+            loss = train(model, device, train_loader, optimizer, args, calc_loss, scheduler if args.scheduler != "plateau" else None, accelerator = accelerator)
+            #accelerator.wait_for_everyone()
+            # if args.model_type == "gnn-bert":
+            #     model.epoch_callback(epoch)
+            if accelerator.is_main_process:
+                wandb.log({f"train/loss-runs{run_id}": loss, f"train/lr": optimizer.param_groups[0]["lr"], f"epoch": epoch})
 
             if args.scheduler == "plateau":
-                valid_perf = eval(model, device, valid_loader, evaluator)
+                valid_perf = eval(model, device, valid_loader, evaluator,accelerator,False)
                 valid_metric = valid_perf[dataset.eval_metric]
                 scheduler.step(valid_metric)
             if epoch > args.start_eval and epoch % args.test_freq == 0 or epoch in [1, args.epochs]:
-                logger.info("Evaluating...")
+                if accelerator.is_main_process:
+                    logger.info("Evaluating...")
                 with torch.no_grad():
-                    train_perf = eval(model, device, train_loader_eval, evaluator)
+                    train_perf = eval(model, device, train_loader_eval, evaluator, accelerator,True)
                     if args.scheduler != "plateau":
-                        valid_perf = eval(model, device, valid_loader, evaluator)
-                    test_perf = eval(model, device, test_loader, evaluator)
+                        valid_perf = eval(model, device, valid_loader, evaluator,accelerator,False)
+                    test_perf = eval(model, device, test_loader, evaluator,accelerator,False)
 
                 train_metric, valid_metric, test_metric = (
                     train_perf[dataset.eval_metric],
                     valid_perf[dataset.eval_metric],
                     test_perf[dataset.eval_metric],
                 )
-                wandb.log(
-                    {
-                        f"train/{dataset.eval_metric}-runs{run_id}": train_metric,
-                        f"valid/{dataset.eval_metric}-runs{run_id}": valid_metric,
-                        f"test/{dataset.eval_metric}-runs{run_id}": test_metric,
-                        "epoch": epoch,
-                    }
-                )
-                logger.info(f"Running: {run_name} (runs {run_id})")
-                logger.info(f"Run {run_id} - train: {train_metric}, val: {valid_metric}, test: {test_metric}")
-
+                if accelerator.is_main_process:
+                    wandb.log(
+                        {
+                            f"train/{dataset.eval_metric}-runs{run_id}": train_metric,
+                            f"valid/{dataset.eval_metric}-runs{run_id}": valid_metric,
+                            f"test/{dataset.eval_metric}-runs{run_id}": test_metric,
+                            "epoch": epoch,
+                        }
+                    )
+                    logger.info(f"Running: {run_name} (runs {run_id})")
+                    logger.info(f"Run {run_id} - train: {train_metric}, val: {valid_metric}, test: {test_metric}")
+                
                 # Save checkpoints
-                state_dict = {"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
+                accelerator.wait_for_everyone()
+                unwrapped_model = accelerator.unwrap_model(model)
+                state_dict = {"model": unwrapped_model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
+                # state_dict = {"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
                 state_dict["scheduler"] = scheduler.state_dict() if args.scheduler else None
                 torch.save(state_dict, os.path.join(args.save_path, str(run_id), "last_model.pt"))
-                logger.info("[Save] Save model: {}", os.path.join(args.save_path, str(run_id), "last_model.pt"))
+                
+                if accelerator.is_main_process:
+                    logger.info("[Save] Save model: {}", os.path.join(args.save_path, str(run_id), "last_model.pt"))
                 if best_val < valid_metric:
                     best_val = valid_metric
                     final_test = test_metric
-                    wandb.run.summary[f"best/valid/{dataset.eval_metric}-runs{run_id}"] = valid_metric
-                    wandb.run.summary[f"best/test/{dataset.eval_metric}-runs{run_id}"] = test_metric
-                    torch.save(state_dict, os.path.join(args.save_path, str(run_id), "best_model.pt"))
-                    logger.info("[Best Model] Save model: {}", os.path.join(args.save_path, str(run_id), "best_model.pt"))
+                    accelerator.save(state_dict, os.path.join(args.save_path, str(run_id), "best_model.pt"))
+                    if accelerator.is_main_process:
+                        # torch.save(state_dict, os.path.join(args.save_path, str(run_id), "best_model.pt"))
+                        wandb.run.summary[f"best/valid/{dataset.eval_metric}-runs{run_id}"] = valid_metric
+                        wandb.run.summary[f"best/test/{dataset.eval_metric}-runs{run_id}"] = test_metric
+                        logger.info("[Best Model] Save model: {}", os.path.join(args.save_path, str(run_id), "best_model.pt"))
 
         state_dict = torch.load(os.path.join(args.save_path, str(run_id), "best_model.pt"))
-        logger.info("[Evaluate] Loaded from {}", os.path.join(args.save_path, str(run_id), "best_model.pt"))
-        model.load_state_dict(state_dict["model"])
-        best_valid_perf = eval(model, device, valid_loader, evaluator)
-        best_test_perf = eval(model, device, test_loader, evaluator)
+        if accelerator.is_main_process:
+            logger.info("[Evaluate] Loaded from {}", os.path.join(args.save_path, str(run_id), "best_model.pt"))
+        unwrapped_model = accelerator.unwrap_model(model)
+        unwrapped_model.load_state_dict(state_dict["model"])
+        best_valid_perf = eval(model, device, valid_loader, evaluator,accelerator,False)
+        best_test_perf = eval(model, device, test_loader, evaluator,accelerator,False)
         return best_valid_perf[dataset.eval_metric], best_test_perf[dataset.eval_metric]
 
-    print(args)
+    # print(args)
     vals, tests = [], []
     for run_id in range(args.runs):
         best_val, final_test = run(run_id)
         vals.append(best_val)
         tests.append(final_test)
-        logger.info(f"Run {run_id} - val: {best_val}, test: {final_test}")
-    logger.info(f"Average val accuracy: {np.mean(vals)} ± {np.std(vals)}")
-    logger.info(f"Average test accuracy: {np.mean(tests)} ± {np.std(tests)}")
+        if accelerator.is_main_process:
+            logger.info(f"Run {run_id} - val: {best_val}, test: {final_test}")
+    if accelerator.is_main_process:
+        logger.info(f"Average val accuracy: {np.mean(vals)} ± {np.std(vals)}")
+        logger.info(f"Average test accuracy: {np.mean(tests)} ± {np.std(tests)}")
 
 
 if __name__ == "__main__":

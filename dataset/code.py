@@ -45,12 +45,11 @@ class CodeUtil:
 
         return calc_loss
 
-    def eval(self, model, device, loader, evaluator):
+    def eval(self, model, device, loader, evaluator,accelerator = None,parallel = False):
         model.eval()
         seq_ref_list = []
         seq_pred_list = []
-
-        for step, batch in enumerate(tqdm(loader, desc="Eval")):
+        for step, batch in enumerate(tqdm(loader, desc="Eval", disable=not accelerator.is_main_process if accelerator else False)):
             batch = batch.to(device)
 
             if batch.x.shape[0] == 1:
@@ -67,24 +66,24 @@ class CodeUtil:
                 seq_pred = [self.arr_to_seq(arr) for arr in mat]
 
                 # PyG >= 1.5.0
-                seq_ref = [[batch.y[0][i]] for i in range(len(batch.y[0]))]
+                seq_ref = [batch.y[i] for i in range(len(batch.y))]
 
                 seq_ref_list.extend(seq_ref)
                 seq_pred_list.extend(seq_pred)
-                # print(batch.y)
-                # print(batch.x)
-                # print("pred_list", pred_list)
-                # print("mat",mat)
-                # print("seq+pred",seq_pred)
-                # print()
-                # break
-                
-        # print("seq_ref", len(seq_ref_list))
-        # print("seq_pred", len(seq_pred_list))      
-        # print("length of loader",len(loader))
+        
         input_dict = {"seq_ref": seq_ref_list, "seq_pred": seq_pred_list}
 
-        return evaluator.eval(input_dict)
+        avg_f1_score = evaluator.eval(input_dict)['F1']
+        if parallel:
+            temp_f1 = torch.tensor([[avg_f1_score, len(seq_ref_list)]]).cuda()
+            temp_f1 = accelerator.gather(temp_f1)
+            sum_f1 = 0
+            num_f1 = 0
+            for i in range(len(temp_f1)):
+                sum_f1 = sum_f1 + temp_f1[i][0]*temp_f1[i][1]
+                num_f1 += temp_f1[i][1]
+            avg_f1_score = sum_f1/num_f1
+        return {'F1':avg_f1_score}
 
     def preprocess(self, dataset, dataset_eval, model_cls, args):
         split_idx = dataset.get_idx_split()
@@ -95,13 +94,8 @@ class CodeUtil:
             )
         )
 
-        # building vocabulary for sequence predition. Only use training data.
-        print(len(dataset.data.y))
-        print(type(dataset.data.y))
-        print(len(split_idx["train"])) #, debugging line 91 
-        #print(dataset.data.y)
-        #print(dataset.data.y[0][1])
-        vocab2idx, idx2vocab = get_vocab_mapping([[dataset.data.y[0][i]] for i in split_idx["train"]], args.num_vocab)
+
+        vocab2idx, idx2vocab = get_vocab_mapping([dataset.data.y[i] for i in split_idx["train"]], args.num_vocab)
 
         self.arr_to_seq = lambda arr: decode_arr_to_seq(arr, idx2vocab)
 

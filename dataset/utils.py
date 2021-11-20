@@ -70,8 +70,8 @@ def get_vocab_mapping(seq_list, num_vocab):
     # logger.info([vocab_list[v] for v in topvocab[-10:]])
 
     #Changed this line from  ""= num_vocab"
-    print(num_vocab)
-    print(len(vocab2idx))
+    # print(num_vocab)
+    # print(len(vocab2idx))
     vocab2idx["__UNK__"] = num_vocab
     #vocab2idx["__UNK__"] = len(vocab2idx)
     idx2vocab.append("__UNK__")

@@ -14,13 +14,13 @@ class BaseTrainer:
         pass
 
     @staticmethod
-    def train(model, device, loader, optimizer, args, calc_loss, scheduler=None):
+    def train(model, device, loader, optimizer, args, calc_loss, scheduler=None, accelerator = None):
         model.train()
 
         loss_accum = 0
-        t = tqdm(loader, desc="Train")
+        t = tqdm(loader, desc="Train", disable=not accelerator.is_main_process)
         for step, batch in enumerate(t):
-            batch = batch.to(device)
+            #batch = batch.to(device)
 
             if batch.x.shape[0] == 1 or batch.batch[-1] == 0:
                 pass
@@ -33,7 +33,8 @@ class BaseTrainer:
 
                 loss = calc_loss(pred_list, batch)
 
-                loss.backward()
+                # loss.backward()
+                accelerator.backward(loss)
                 if args.grad_clip is not None:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
                 optimizer.step()
@@ -43,10 +44,12 @@ class BaseTrainer:
 
                 detached_loss = loss.item()
                 loss_accum += detached_loss
-                t.set_description(f"Train (loss = {detached_loss:.4f}, smoothed = {loss_accum / (step + 1):.4f})")
-                wandb.log({"train/iter-loss": detached_loss, "train/iter-loss-smoothed": loss_accum / (step + 1)})
-
-        logger.info("Average training loss: {:.4f}".format(loss_accum / (step + 1)))
+                if accelerator.is_main_process:
+                    t.set_description(f"Train (loss = {detached_loss:.4f}, smoothed = {loss_accum / (step + 1):.4f})")
+                    wandb.log({"train/iter-loss": detached_loss, "train/iter-loss-smoothed": loss_accum / (step + 1)})
+        if accelerator.is_main_process:
+            print("in the main process")
+            logger.info("Average training loss: {:.4f}".format(loss_accum / (step + 1)))
         return loss_accum / (step + 1)
 
     @staticmethod

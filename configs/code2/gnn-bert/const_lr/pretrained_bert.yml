@@ -7,7 +7,7 @@ gnn_virtual_node: true
 
 graph_pooling: cls
 
-batch_size: 16
+batch_size: 8
 lr: 0.00003
 
 runs: 1
@@ -23,7 +23,7 @@ checkpoint: bert-base-uncased
 
 d_model: 768
 dim_feedforward: 256
-num_encoder_layers: 4
+# num_encoder_layers: 4
 # scheduler: custom
 
 transformer_dropout: 0.1

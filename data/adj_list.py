@@ -19,31 +19,34 @@ def make_adj_list_wrapper(x):
     return make_adj_list(x.num_nodes, x["edge_index"].T)
 
 
-def compute_adjacency_list(data):
+def compute_adjacency_list(data,accelerator=None):
     out = []
-    for x in tqdm(data, "adjacency list", leave=False):
+    for x in tqdm(data, "adjacency list", leave=False, disable=not accelerator.is_main_process if accelerator else False):
         out.append(make_adj_list_wrapper(x))
     return out
 
 
-def combine_results(data, adj_list):
+def combine_results(data, adj_list,accelerator = None):
     out_data = []
-    for x, l in tqdm(zip(data, adj_list), "assembling adj_list result", total=len(data), leave=False):
+    for x, l in tqdm(zip(data, adj_list), "assembling adj_list result", total=len(data), leave=False, disable=not accelerator.is_main_process if accelerator else False):
         x["adj_list"] = l
         out_data.append(x)
     return out_data
 
 
-def compute_adjacency_list_cached(data, key, root):
+def compute_adjacency_list_cached(data, key, root,accelerator):
     cachefile = f"{root}/OGB_ADJLIST_{key}.pickle"
     if os.path.exists(cachefile):
         with open(cachefile, "rb") as cachehandle:
             logger.debug("using cached result from '%s'" % cachefile)
             result = pickle.load(cachehandle)
         return combine_results(data, result)
-    result = compute_adjacency_list(data)
-    with open(cachefile, "wb") as cachehandle:
-        logger.debug("saving result to cache '%s'" % cachefile)
-        pickle.dump(result, cachehandle)
-    logger.info("Got adjacency list data for key %s" % key)
-    return combine_results(data, result)
+    accelerator.wait_for_everyone()
+    result = compute_adjacency_list(data,accelerator)
+    if accelerator.is_main_process:
+        with open(cachefile, "wb") as cachehandle:
+            logger.debug("saving result to cache '%s'" % cachefile)
+            pickle.dump(result, cachehandle)
+        logger.info("Got adjacency list data for key %s" % key)
+    accelerator.wait_for_everyone()
+    return combine_results(data, result,accelerator)
