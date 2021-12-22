@@ -18,7 +18,7 @@ gnn_JK: cat
 
 # checkpoint: bert-base-uncased
 freeze_bert: 0
-unfreeze_bert: 3
+unfreeze_bert: 0
 warmup_epochs: 3
 epochs: 36
 

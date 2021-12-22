@@ -11,7 +11,7 @@ seed=$2
 lr=$3
 
 echo $(scontrol show hostnames $SLURM_JOB_NODELIST)
-export PATH=/data/ethanbmehta/miniconda3/bin:$PATH
+export PATH=/data/adnans/miniconda3/bin:$PATH
 source ~/.bashrc
 conda activate graph-aug
 

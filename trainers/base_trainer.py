@@ -35,8 +35,7 @@ class BaseTrainer:
 
                 # loss.backward()
                 accelerator.backward(loss)
-                if args.grad_clip is not None:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
 
                 if scheduler:

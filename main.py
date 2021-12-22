@@ -281,11 +281,12 @@ def main():
                 valid_perf = eval(model, device, valid_loader, evaluator,accelerator,False)
                 valid_metric = valid_perf[dataset.eval_metric]
                 scheduler.step(valid_metric)
-            if epoch > args.start_eval and epoch % args.test_freq == 0 or epoch in [1, args.epochs]:
+            if True or epoch > args.start_eval and epoch % args.test_freq == 0 or epoch in [1, args.epochs]:##changed
                 if accelerator.is_main_process:
                     logger.info("Evaluating...")
                 with torch.no_grad():
-                    train_perf = eval(model, device, train_loader_eval, evaluator, accelerator,True)
+                    #train_perf = eval(model, device, train_loader_eval, evaluator, accelerator,True)
+                    train_perf = {"F1":0,'f1':0}##changed
                     if args.scheduler != "plateau":
                         valid_perf = eval(model, device, valid_loader, evaluator,accelerator,False)
                     test_perf = eval(model, device, test_loader, evaluator,accelerator,False)
@@ -307,25 +308,25 @@ def main():
                     logger.info(f"Running: {run_name} (runs {run_id})")
                     logger.info(f"Run {run_id} - train: {train_metric}, val: {valid_metric}, test: {test_metric}")
                 
-                # Save checkpoints
-                accelerator.wait_for_everyone()
-                unwrapped_model = accelerator.unwrap_model(model)
-                state_dict = {"model": unwrapped_model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
-                # state_dict = {"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
-                state_dict["scheduler"] = scheduler.state_dict() if args.scheduler else None
-                torch.save(state_dict, os.path.join(args.save_path, str(run_id), "last_model.pt"))
+#                 # Save checkpoints
+#                 accelerator.wait_for_everyone()
+#                 unwrapped_model = accelerator.unwrap_model(model)
+#                 state_dict = {"model": unwrapped_model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
+#                 # state_dict = {"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
+#                 state_dict["scheduler"] = scheduler.state_dict() if args.scheduler else None
+#                 torch.save(state_dict, os.path.join(args.save_path, str(run_id), "last_model.pt"))
                 
-                if accelerator.is_main_process:
-                    logger.info("[Save] Save model: {}", os.path.join(args.save_path, str(run_id), "last_model.pt"))
-                if best_val < valid_metric:
-                    best_val = valid_metric
-                    final_test = test_metric
-                    accelerator.save(state_dict, os.path.join(args.save_path, str(run_id), "best_model.pt"))
-                    if accelerator.is_main_process:
-                        # torch.save(state_dict, os.path.join(args.save_path, str(run_id), "best_model.pt"))
-                        wandb.run.summary[f"best/valid/{dataset.eval_metric}-runs{run_id}"] = valid_metric
-                        wandb.run.summary[f"best/test/{dataset.eval_metric}-runs{run_id}"] = test_metric
-                        logger.info("[Best Model] Save model: {}", os.path.join(args.save_path, str(run_id), "best_model.pt"))
+#                 if accelerator.is_main_process:
+#                     logger.info("[Save] Save model: {}", os.path.join(args.save_path, str(run_id), "last_model.pt"))
+#                 if best_val < valid_metric:
+#                     best_val = valid_metric
+#                     final_test = test_metric
+#                     accelerator.save(state_dict, os.path.join(args.save_path, str(run_id), "best_model.pt"))
+#                     if accelerator.is_main_process:
+#                         # torch.save(state_dict, os.path.join(args.save_path, str(run_id), "best_model.pt"))
+#                         wandb.run.summary[f"best/valid/{dataset.eval_metric}-runs{run_id}"] = valid_metric
+#                         wandb.run.summary[f"best/test/{dataset.eval_metric}-runs{run_id}"] = test_metric
+#                         logger.info("[Best Model] Save model: {}", os.path.join(args.save_path, str(run_id), "best_model.pt"))
 
         state_dict = torch.load(os.path.join(args.save_path, str(run_id), "best_model.pt"))
         if accelerator.is_main_process:
