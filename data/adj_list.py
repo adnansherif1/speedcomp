@@ -16,6 +16,7 @@ def make_adj_list(N, edge_index_transposed):
 
 
 def make_adj_list_wrapper(x):
+    print(x)
     return make_adj_list(x["num_nodes"], x["edge_index"].T)
 
 
