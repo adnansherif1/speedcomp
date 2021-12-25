@@ -155,9 +155,9 @@ def main():
     eval = dataset_util.eval
 
     def create_loader(dataset, dataset_eval):
-        test_data = compute_adjacency_list_cached(dataset[split_idx["test"]], key=f"{args.dataset}_test", root=args.data_tmp,accelerator = accelerator)
-        valid_data = compute_adjacency_list_cached(dataset_eval[split_idx["valid"]], key=f"{args.dataset}_valid", root=args.data_tmp, accelerator= accelerator)
-        train_data = compute_adjacency_list_cached(dataset[split_idx["train"]], key=f"{args.dataset}_train", root=args.data_tmp,accelerator = accelerator)
+        test_data = compute_adjacency_list_cached(dataset[split_idx["test"]], key=f"{args.dataset}_test", root=args.data_tmp,args = args,accelerator = accelerator,device=device)
+        valid_data = compute_adjacency_list_cached(dataset_eval[split_idx["valid"]], key=f"{args.dataset}_valid", root=args.data_tmp,args = args, accelerator= accelerator,device=device)
+        train_data = compute_adjacency_list_cached(dataset[split_idx["train"]], key=f"{args.dataset}_train", root=args.data_tmp,args = args,accelerator = accelerator,device=device)
         logger.debug("Finished computing adjacency list")
         # test_data = dataset[split_idx["test"][:5000]]
         # valid_data = dataset_eval[split_idx["valid"][:5000]]
@@ -188,6 +188,7 @@ def main():
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
     def run(run_id):
+        vals, tests = [],[]
         if "ogb" not in args.dataset:
             dataset, _, _, _, _ = dataset_util.preprocess(args)
             dataset_eval = dataset
@@ -285,8 +286,8 @@ def main():
                 if accelerator.is_main_process:
                     logger.info("Evaluating...")
                 with torch.no_grad():
-                    #train_perf = eval(model, device, train_loader_eval, evaluator, accelerator,True)
-                    train_perf = {"F1":0,'f1':0}##changed
+                    train_perf = eval(model, device, train_loader_eval, evaluator, accelerator,True)
+                    # train_perf = {"F1":0,'f1':0}##changed
                     if args.scheduler != "plateau":
                         valid_perf = eval(model, device, valid_loader, evaluator,accelerator,False)
                     test_perf = eval(model, device, test_loader, evaluator,accelerator,False)
@@ -307,6 +308,9 @@ def main():
                     )
                     logger.info(f"Running: {run_name} (runs {run_id})")
                     logger.info(f"Run {run_id} - train: {train_metric}, val: {valid_metric}, test: {test_metric}")
+                    
+                vals.append(valid_metric)
+                tests.append(test_metric)
                 
 #                 # Save checkpoints
 #                 accelerator.wait_for_everyone()
@@ -328,14 +332,20 @@ def main():
 #                         wandb.run.summary[f"best/test/{dataset.eval_metric}-runs{run_id}"] = test_metric
 #                         logger.info("[Best Model] Save model: {}", os.path.join(args.save_path, str(run_id), "best_model.pt"))
 
-        state_dict = torch.load(os.path.join(args.save_path, str(run_id), "best_model.pt"))
-        if accelerator.is_main_process:
-            logger.info("[Evaluate] Loaded from {}", os.path.join(args.save_path, str(run_id), "best_model.pt"))
-        unwrapped_model = accelerator.unwrap_model(model)
-        unwrapped_model.load_state_dict(state_dict["model"])
-        best_valid_perf = eval(model, device, valid_loader, evaluator,accelerator,False)
-        best_test_perf = eval(model, device, test_loader, evaluator,accelerator,False)
-        return best_valid_perf[dataset.eval_metric], best_test_perf[dataset.eval_metric]
+        # state_dict = torch.load(os.path.join(args.save_path, str(run_id), "best_model.pt"))
+        # if accelerator.is_main_process:
+        #     logger.info("[Evaluate] Loaded from {}", os.path.join(args.save_path, str(run_id), "best_model.pt"))
+        # unwrapped_model = accelerator.unwrap_model(model)
+        # unwrapped_model.load_state_dict(state_dict["model"])
+        # best_valid_perf = eval(model, device, valid_loader, evaluator,accelerator,False)
+        # best_test_perf = eval(model, device, test_loader, evaluator,accelerator,False)
+        # return best_valid_perf[dataset.eval_metric], best_test_perf[dataset.eval_metric]
+        best = 0
+        maximum = max(vals)
+        for i in range(len(vals)):
+            if vals[i] == maximum:
+                best = max(best,tests[i])
+        return maximum, best
 
     # print(args)
     vals, tests = [], []

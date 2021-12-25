@@ -12,7 +12,7 @@ from torch_geometric.nn import (
 
 from modules.gnn_module import GNNNodeEmbedding
 from modules.transformer_encoder import TransformerNodeEncoder
-from modules.utils import pad_batch, unpad_batch
+from modules.utils import pad_batch, unpad_batch, mask_batch
 
 from .base_model import BaseModel
 
@@ -38,13 +38,14 @@ class Transformer(BaseModel):
     def __init__(self, num_tasks, node_encoder, edge_encoder_cls, args):
         super().__init__()
         self.transformer = TransformerNodeEncoder(args)
-
+        self.nhead = args.nhead
         self.node_encoder = node_encoder
 
         self.emb_dim = args.d_model
         self.num_tasks = num_tasks
         self.max_seq_len = args.max_seq_len
         self.graph_pooling = args.graph_pooling
+        self.virtual_node = args.gnn_virtual_node
 
         ### Pooling function to generate whole-graph embeddings
         if self.graph_pooling == "sum":
@@ -84,7 +85,7 @@ class Transformer(BaseModel):
                     self.graph_pred_linear_list.append(torch.nn.Linear(self.emb_dim, self.num_tasks))
 
     def forward(self, batched_data, perturb=None):
-        x, edge_index, edge_attr, batch = batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch
+        x, edge_index, edge_attr, batch, attn_mask = batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch, batched_data.adj_list
         node_depth = batched_data.node_depth if hasattr(batched_data, "node_depth") else None
         encoded_node = (
             self.node_encoder(x)
@@ -99,9 +100,11 @@ class Transformer(BaseModel):
         tmp = encoded_node + perturb if perturb is not None else encoded_node
 
         h_node, src_key_padding_mask, num_nodes, mask, max_num_nodes = pad_batch(tmp, batch, self.transformer.max_input_len, get_mask=True)
-        h_node, src_key_padding_mask = self.transformer(h_node, src_key_padding_mask)
+        attn_mask = mask_batch(attn_mask,len(src_key_padding_mask[0]),self.nhead,self.virtual_node)##
+        h_node, src_key_padding_mask = self.transformer(h_node, src_key_padding_mask, attn_mask)
         if self.graph_pooling == "cls":
             h_graph = h_node[-1]
+            # print(h_graph)
         else:
             h_node = unpad_batch(h_node, tmp, num_nodes, mask, max_num_nodes)
             h_graph = self.pool(h_node, batched_data.batch)

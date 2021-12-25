@@ -87,7 +87,7 @@ class GNNTransformer(BaseModel):
             for i in range(args.max_seq_len):
                 self.graph_pred_linear_list.append(torch.nn.Linear(output_dim, self.num_tasks))
         # if args.dataset == ... TODO
-        self.softm = nn.LogSoftmax(dim=1) # Only for NCI1
+        # self.softm = nn.LogSoftmax(dim=1) # Only for NCI1
 
     def forward(self, batched_data, perturb=None):
         h_node = self.gnn_node(batched_data, perturb) 

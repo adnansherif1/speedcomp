@@ -23,15 +23,16 @@ class TUUtil:
     @staticmethod
     def loss_fn(task_type):
         def calc_loss(pred, batch, m=1.0):
-            loss = F.nll_loss(pred, batch.y)
+            #loss = F.nll_loss(pred, batch.y)
             # loss = nn.LogSoftmax(dim=1)(loss) # changed to fix loss function for tud
+            loss = F.cross_entropy(pred, batch.y)
             return loss
 
         return calc_loss
 
     @staticmethod
     @torch.no_grad()
-    def eval(model, device, loader, evaluator):
+    def eval(model, device, loader, evaluator,accelerator = None,parallel = False):
         model.eval()
 
         correct = 0
