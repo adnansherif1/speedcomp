@@ -35,9 +35,9 @@ from multiprocessing import Pool
 #     return adj_list
 def make_adj_list(N, edge_index_transposed,args=None):
 
-    edge_index_transposed = torch.tensor(edge_index_transposed, device='cpu')
-    A = torch.eye(N, device = 'cpu')
-    C = torch.eye(N, device = 'cpu')
+    edge_index_transposed = torch.tensor(edge_index_transposed, device='cuda')
+    A = torch.eye(N, device = 'cuda')
+    C = torch.eye(N, device = 'cuda')
     # else:
     #     edge_index_transposed = torch.tensor(edge_index_transposed, device='cuda')
     #     A = torch.eye(N, device = 'cuda')
@@ -165,11 +165,11 @@ def compute_adjacency_list_cached(data, key, root, args, accelerator, device):
     # result = compute_adjacency_list(data,args,accelerator)
     result = compute_adjacency_list(data,args,accelerator)
     
-    if accelerator.is_main_process:
-        with open(cachefile, "wb") as cachehandle:
-            logger.debug("saving result to cache '%s'" % cachefile)
-            pickle.dump(result, cachehandle)
-        logger.info("Got adjacency list data for key %s" % key)
+    # if accelerator.is_main_process:
+    #     with open(cachefile, "wb") as cachehandle:
+    #         logger.debug("saving result to cache '%s'" % cachefile)
+    #         pickle.dump(result, cachehandle)
+    #     logger.info("Got adjacency list data for key %s" % key)
     accelerator.wait_for_everyone()
     return combine_results(data, result,args,accelerator,device)
 
