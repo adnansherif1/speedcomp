@@ -3,7 +3,9 @@ aug: baseline
 model_type: gnn
 gnn_type: gcn
 gnn_virtual_node: true
-runs: 5
+runs: 3
 epochs: 200
 seed: 12344
 scheduler: plateau
+data_tmp: "/data/adnans/tmp"
+data_root: "/data/adnans/ogb"

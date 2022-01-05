@@ -65,10 +65,11 @@ def main():
     group.add_argument('--gnn_dropout', type=float, default=0)
     group.add_argument('--gnn_num_layer', type=int, default=5,
                         help='number of GNN message passing layers (default: 5)')
-    group.add_argument('--gnn_emb_dim', type=int, default=300,
-                        help='dimensionality of hidden units in GNNs (default: 300)')
+    group.add_argument('--gnn_emb_dim', type=int, default=256,
+                        help='dimensionality of hidden units in GNNs (default: 256)')
     group.add_argument('--gnn_JK', type=str, default='last')
     group.add_argument('--gnn_residual', action='store_true', default=False)
+    group.add_argument('--gnn_expanded', action='store_true', default=False)
 
     group = parser.add_argument_group('training')
     group.add_argument('--devices', type=str, default="0",

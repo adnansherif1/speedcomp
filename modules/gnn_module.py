@@ -11,6 +11,7 @@ from torch_geometric.nn import (
 from torch_geometric.nn.inits import uniform
 
 from modules.conv import GCNConv, GINConv
+from modules.gatconv import GATConv
 from modules.utils import pad_batch
 
 
@@ -25,7 +26,7 @@ class GNN_node(torch.nn.Module):
     def need_deg():
         return False
 
-    def __init__(self, num_layer, emb_dim, node_encoder, edge_encoder_cls, drop_ratio=0.5, JK="last", residual=False, gnn_type="gin"):
+    def __init__(self, num_layer, emb_dim, node_encoder, edge_encoder_cls, drop_ratio=0.5, JK="last", residual=False, gnn_type="gin", gat_heads = 4, expanded = False):
         """
         emb_dim (int): node embedding dimensionality
         num_layer (int): number of GNN message passing layers
@@ -46,12 +47,14 @@ class GNN_node(torch.nn.Module):
         ###List of GNNs
         self.convs = torch.nn.ModuleList()
         self.batch_norms = torch.nn.ModuleList()
-
+        self.rates = [7.0,4.0,1.0]
         for layer in range(num_layer):
             if gnn_type == "gin":
                 self.convs.append(GINConv(emb_dim, edge_encoder_cls))
             elif gnn_type == "gcn":
                 self.convs.append(GCNConv(emb_dim, edge_encoder_cls))
+            elif gnn_type == "gat":
+                self.convs.append(GATConv(emb_dim,emb_dim//gat_heads, gat_heads,expanded = expanded,rate=self.rates[i]))
             else:
                 ValueError("Undefined GNN type called {}".format(gnn_type))
 
@@ -59,8 +62,32 @@ class GNN_node(torch.nn.Module):
 
     def forward(self, batched_data, perturb=None):
         x, edge_index, edge_attr, batch = batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch
+        edge_index_new = batched_data.edge_index_new if hasattr(batched_data, "edge_index_new") else None
+        N = batched_data.num_nodes
+        weight = batched_data.weight if hasattr(batched_data, "weight") else None
         node_depth = batched_data.node_depth if hasattr(batched_data, "node_depth") else None
-
+        
+        edge_index_new = []
+        for i in range(len(N)):
+            n = torch.sqrt(N[i]).to(torch.int32)
+            row_index = torch.arange(n,device = x.device).reshape((-1,1)).repeat((1,n-1)).reshape((-1,))
+            col_index = torch.arange(n, device = x.device).repeat((n,)).reshape((n,n))
+            col_index[torch.eye(n, device = x.device).bool()] = -1
+            col_index = col_index[col_index!=-1]
+            edge_index_new.append(torch.stack((row_index,col_index)))
+        edge_index_new = torch.cat(edge_index_new,dim=-1)
+        N_shift = torch.roll(N,1)
+        N_shift[0] = 0
+        shift = torch.cat([N_shift[i].repeat(N[i].item()) for i in range(len(N))])
+        edge_index_new = edge_index_new + shift
+        
+        torch.set_printoptions(profile="full")
+        print(x.shape)
+        print(weight.shape)
+        print(N)
+        print(edge_index_new.shape, edge_index_new)
+        exit()
+        
         ### computing input node embedding
         if self.node_encoder is not None:
             encoded_node = (
@@ -80,7 +107,8 @@ class GNN_node(torch.nn.Module):
 
         for layer in range(self.num_layer):
 
-            h = self.convs[layer](h_list[layer], edge_index, edge_attr)
+            # h = self.convs[layer](h_list[layer], edge_index, edge_attr)
+            h = self.convs[layer](h_list[layer], edge_index, edge_attr, edge_index_new, weight)
             h = self.batch_norms[layer](h)
 
             if layer == self.num_layer - 1:
@@ -118,7 +146,7 @@ class GNN_node_Virtualnode(torch.nn.Module):
     def need_deg():
         return False
 
-    def __init__(self, num_layer, emb_dim, node_encoder, edge_encoder_cls, drop_ratio=0.5, JK="last", residual=False, gnn_type="gin"):
+    def __init__(self, num_layer, emb_dim, node_encoder, edge_encoder_cls, drop_ratio=0.5, JK="last", residual=False, gnn_type="gin", gat_heads = 4, expanded=False):
         """
         emb_dim (int): node embedding dimensionality
         """
@@ -146,12 +174,15 @@ class GNN_node_Virtualnode(torch.nn.Module):
 
         ### List of MLPs to transform virtual node at every layer
         self.mlp_virtualnode_list = torch.nn.ModuleList()
-
+        
+        self.rates = [5.0,4.0,3.0,1.0]
         for layer in range(num_layer):
             if gnn_type == "gin":
                 self.convs.append(GINConv(emb_dim, edge_encoder_cls))
             elif gnn_type == "gcn":
                 self.convs.append(GCNConv(emb_dim, edge_encoder_cls))
+            elif gnn_type == "gat":
+                self.convs.append(GATConv(emb_dim,emb_dim//gat_heads, gat_heads,expanded=expanded, rate=self.rates[layer]))
             else:
                 ValueError("Undefined GNN type called {}".format(gnn_type))
 
@@ -172,8 +203,37 @@ class GNN_node_Virtualnode(torch.nn.Module):
     def forward(self, batched_data, perturb=None):
 
         x, edge_index, edge_attr, batch = batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch
+        edge_index_new = batched_data.edge_index_new if hasattr(batched_data, "edge_index_new") else None
+        N = batched_data.N
+        weight = batched_data.weight if hasattr(batched_data, "weight") else None
         node_depth = batched_data.node_depth if hasattr(batched_data, "node_depth") else None
 
+        edge_index_new = []
+        for i in range(len(N)):
+            n = torch.sqrt(N[i]).to(torch.int32)
+            row_index = torch.arange(n,device = x.device).reshape((-1,1)).repeat((1,n-1)).reshape((-1,))
+            col_index = torch.arange(n, device = x.device).repeat((n,)).reshape((n,n))
+            col_index[torch.eye(n, device = x.device).bool()] = -1
+            col_index = col_index[col_index!=-1]
+            edge_index_new.append(torch.stack((row_index,col_index)))
+        edge_index_new = torch.cat(edge_index_new,dim=-1)
+        
+        N_root = torch.sqrt(N).to(torch.int32)
+        N_shift = torch.roll(N_root,1)
+        N_shift[0] = 0
+        N_shift = torch.cumsum(N_shift,dim=0)
+        N = N - torch.sqrt(N).to(torch.int)
+        shift = torch.cat([N_shift[i].repeat(N[i].item()) for i in range(len(N))])
+        edge_index_new = edge_index_new + shift
+        
+        # torch.set_printoptions(profile="full")
+        # print(x.shape)
+        # print(weight.shape)
+        # print(N.shape)
+        # print(edge_index_new.shape, edge_index_new)
+        # print(edge_index)
+        # exit()
+        
         ### computing input node embedding
         if self.node_encoder is not None:
             encoded_node = (
@@ -199,8 +259,8 @@ class GNN_node_Virtualnode(torch.nn.Module):
             h_list[layer] = h_list[layer] + virtualnode_embedding[batch]
 
             ### Message passing among graph nodes
-            h = self.convs[layer](h_list[layer], edge_index, edge_attr)
-
+            # h = self.convs[layer](h_list[layer], edge_index, edge_attr)
+            h = self.convs[layer](h_list[layer], edge_index, edge_attr, edge_index_new, weight)
             h = self.batch_norms[layer](h)
             if layer == self.num_layer - 1:
                 # remove relu for the last layer

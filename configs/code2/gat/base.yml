@@ -1,0 +1,24 @@
+dataset: ogbg-code2
+aug: baseline
+model_type: gnn
+gnn_type: gat
+# gnn_virtual_node: false
+
+runs: 1
+epochs: 30
+seed: 12344
+scheduler: plateau
+
+data_tmp: "/data/adnans/tmp"
+data_root: "/data/adnans/ogb"
+gnn_num_layer: 4
+# max_input_len: 200
+graph_pooling: attention
+gnn_emb_dim: 256
+gat_heads: 4
+##
+batch_size: 8
+##
+gnn_virtual_node: True
+gnn_residual: True
+gnn_expanded: True

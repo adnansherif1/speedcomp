@@ -20,7 +20,8 @@ class GNN(BaseModel):
 
     @staticmethod
     def add_args(parser):
-        return
+        group = parser.add_argument_group("Masked Transformer Encoder -- architecture config")
+        group.add_argument("--gat_heads", type=int, default=4)
 
     @staticmethod
     def name(args):
@@ -43,6 +44,7 @@ class GNN(BaseModel):
         self.num_tasks = num_tasks
         self.max_seq_len = args.max_seq_len
         self.graph_pooling = args.graph_pooling
+        self.gat_heads = args.gat_heads
 
         if self.num_layer < 2:
             raise ValueError("Number of GNN layers must be greater than 1.")
@@ -58,6 +60,8 @@ class GNN(BaseModel):
             drop_ratio=self.drop_ratio,
             residual=args.gnn_residual,
             gnn_type=args.gnn_type,
+            gat_heads = self.gat_heads,
+            expanded = args.gnn_expanded
         )
 
         ### Pooling function to generate whole-graph embeddings
