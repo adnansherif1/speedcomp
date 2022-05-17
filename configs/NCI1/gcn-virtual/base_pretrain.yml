@@ -1,12 +1,13 @@
-dataset: DD
-aug: baseline
+dataset: IMDB-MULTI,IMDB-BINARY,NCI1
+aug: baseline_pretrain
 model_type: gnn
 gnn_type: gin
 gnn_virtual_node: true
+gnn_residual: true
 runs: 3
 epochs: 100
 seed: 12344
 scheduler: plateau
-gnn_virtual_attention: true
+steps: 100
 data_tmp: "/data/adnans/tmp"
 data_root: "/data/adnans/ogb"

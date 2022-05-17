@@ -116,13 +116,14 @@ class CodeUtil:
         # 1. node type
         # 2. node attribute
         # 3. node depth
-        node_encoder_cls = lambda: ASTNodeEncoder(
+        node_encoder_cls = lambda: NE(
             args.gnn_emb_dim,
             num_nodetypes=len(nodetypes_mapping["type"]),
             num_nodeattributes=len(nodeattributes_mapping["attr"]),
             max_depth=20,
+            att_node = args.gnn_att_node,
         )
-        edge_encoder_cls = lambda emb_dim: nn.Linear(2, emb_dim)
+        edge_encoder_cls = lambda emb_dim: EE(emb_dim,att_node = args.gnn_att_node)
 
         deg = None
         # Compute in-degree histogram over training data.
@@ -139,3 +140,42 @@ class CodeUtil:
             logger.debug("Avg num nodes: {}", num_nodes / num_graphs)
             logger.debug("Avg deg: {}", deg)
         return len(vocab2idx), node_encoder_cls, edge_encoder_cls, deg
+
+    
+class NE(torch.nn.Module):
+
+    def __init__(self, emb_dim,num_nodetypes,num_nodeattributes, max_depth,att_node):
+        super(NE, self).__init__()
+        self.node_encoder = ASTNodeEncoder(emb_dim,num_nodetypes=num_nodetypes,num_nodeattributes=num_nodeattributes,max_depth=max_depth)
+        self.att_node = att_node
+        if self.att_node:
+            self.att_emb = nn.Parameter(torch.randn([emb_dim], requires_grad=True))
+    def forward(self, x,depth):
+        is_att = x[:,0]==-1
+        # print(len(x),x.shape, len(is_att),is_att)
+        # exit()
+        if self.att_node:
+            x = x*(1-is_att.reshape(-1,1).long())
+        out = self.node_encoder(x,depth=depth)
+        # out = x*(1-is_att.reshape(-1,1))
+        if self.att_node:
+            # out += self.att_emb.repeat(len(out),1)*is_att.reshape((-1,1))
+            out[is_att] = self.att_emb
+        return out
+    
+class EE(torch.nn.Module):
+
+    def __init__(self, emb_dim,att_node):
+        super(EE, self).__init__()
+        self.edge_encoder = nn.Linear(2, emb_dim)
+        self.att_edge = att_node
+        if self.att_edge:
+            self.att_emb = nn.Parameter(torch.randn([emb_dim], requires_grad=True))
+    def forward(self, x):
+        is_att_edge = x[:,0] == -1
+        if self.att_edge:
+            x = x*(1-is_att_edge.reshape(-1,1).long())
+        out = self.edge_encoder(x)
+        if self.att_edge:
+            out[is_att_edge] = self.att_emb
+        return out

@@ -10,7 +10,7 @@ from torch_geometric.utils import degree
 from tqdm import tqdm
 from torchvision import transforms
 
-class TUUtil:
+class TUUtil_pretrain:
     @staticmethod
     def add_args(parser):
         parser.set_defaults(batch_size=128)
@@ -45,8 +45,8 @@ class TUUtil:
         return {"acc": correct / len(loader.dataset)}
 
     @staticmethod
-    def preprocess(args):
-        dataset = TUDataset(os.path.join(args.data_root, args.dataset), name=args.dataset)
+    def preprocess(args, dataset_name):
+        dataset = TUDataset(os.path.join(args.data_root, dataset_name), name=dataset_name)
         
         num_tasks = dataset.num_classes
 
@@ -77,7 +77,8 @@ class TUUtil:
         dataset.get_idx_split = lambda: {"train": "train", "valid": "valid", "test": "test"}
         # print("features",num_features)
         # exit()
-        node_encoder_cls = lambda: nn.Linear(num_features, args.gnn_emb_dim)
+        # node_encoder_cls = lambda: nn.Linear(num_features, args.gnn_emb_dim)
+        node_encoder_cls = lambda: lambda x : x
 
         def edge_encoder_cls(_):
             def zero(_):

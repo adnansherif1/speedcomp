@@ -48,6 +48,7 @@ class GNNTransformer(BaseModel):
     def __init__(self, num_tasks, node_encoder, edge_encoder_cls, args):
         super().__init__()
         self.gnn_node = GNNNodeEmbedding(
+            args,
             args.gnn_virtual_node,
             args.gnn_num_layer,
             args.gnn_emb_dim,
@@ -57,6 +58,9 @@ class GNNTransformer(BaseModel):
             drop_ratio=args.gnn_dropout,
             residual=args.gnn_residual,
             gnn_type=args.gnn_type,
+            gat_heads = None,
+            expanded = args.gnn_expanded,
+            virtual_attention = args.gnn_virtual_attention
         )
         if args.pretrained_gnn:
             # logger.info(self.gnn_node)
@@ -111,7 +115,7 @@ class GNNTransformer(BaseModel):
                 transformer_out.transpose(0, 1), attn_mask=padded_adj_list, valid_input_mask=src_padding_mask
             ).transpose(0, 1)
         if self.num_encoder_layers > 0:
-            transformer_out, _ = self.transformer_encoder(transformer_out, src_padding_mask)  # [s, b, h], [b, s]
+            transformer_out, _ = self.transformer_encoder(transformer_out, src_padding_mask,attn_mask=None)  # [s, b, h], [b, s]
 
         if self.pooling in ["last", "cls"]:
             h_graph = transformer_out[-1]
@@ -122,7 +126,6 @@ class GNNTransformer(BaseModel):
 
         if self.max_seq_len is None:
             out = self.graph_pred_linear(h_graph)
-            out=self.softm(out) # For NCI1 only TODO
             return out
         pred_list = []
         for i in range(self.max_seq_len):

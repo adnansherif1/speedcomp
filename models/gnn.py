@@ -1,17 +1,19 @@
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import (
-    GlobalAttention,
+    # GlobalAttention,
     Set2Set,
     global_add_pool,
     global_max_pool,
     global_mean_pool,
 )
-
+from modules.utils import pad_batch, GlobalAttention, GraphMultisetTransformer
 from modules.gnn_module import GNNNodeEmbedding
 
 from .base_model import BaseModel
 
+def global_att_pool(x, is_att, n =None):
+    return x[is_att.reshape((-1,))]
 
 class GNN(BaseModel):
     @staticmethod
@@ -36,7 +38,7 @@ class GNN(BaseModel):
         """
 
         super(GNN, self).__init__()
-
+        self.att_node = args.gnn_att_node
         self.num_layer = args.gnn_num_layer
         self.drop_ratio = args.gnn_dropout
         self.JK = args.gnn_JK
@@ -45,12 +47,13 @@ class GNN(BaseModel):
         self.max_seq_len = args.max_seq_len
         self.graph_pooling = args.graph_pooling
         self.gat_heads = args.gat_heads
-
+        self.dataset = args.dataset
         if self.num_layer < 2:
             raise ValueError("Number of GNN layers must be greater than 1.")
 
         ### GNN to generate node embeddings
         self.gnn_node = GNNNodeEmbedding(
+            args,
             args.gnn_virtual_node,
             self.num_layer,
             self.emb_dim,
@@ -61,7 +64,8 @@ class GNN(BaseModel):
             residual=args.gnn_residual,
             gnn_type=args.gnn_type,
             gat_heads = self.gat_heads,
-            expanded = args.gnn_expanded
+            expanded = args.gnn_expanded,
+            virtual_attention = args.gnn_virtual_attention
         )
 
         ### Pooling function to generate whole-graph embeddings
@@ -71,6 +75,10 @@ class GNN(BaseModel):
             self.pool = global_mean_pool
         elif self.graph_pooling == "max":
             self.pool = global_max_pool
+        elif self.graph_pooling == "gmt":
+            self.pool = GraphMultisetTransformer(self.emb_dim,self.emb_dim,self.emb_dim,num_nodes=28)
+        elif self.graph_pooling == "global_attention":
+            self.pool = GlobalAttention(self.emb_dim,5) 
         elif self.graph_pooling == "attention":
             self.pool = GlobalAttention(
                 gate_nn=torch.nn.Sequential(
@@ -82,6 +90,8 @@ class GNN(BaseModel):
             )
         elif self.graph_pooling == "set2set":
             self.pool = Set2Set(self.emb_dim, processing_steps=2)
+        elif self.graph_pooling == "cls":
+            self.pool = global_att_pool
         else:
             raise ValueError("Invalid graph pooling type.")
 
@@ -107,11 +117,22 @@ class GNN(BaseModel):
         """
 
         h_node = self.gnn_node(batched_data, perturb)
-
-        h_graph = self.pool(h_node, batched_data.batch)
+        
+        if self.att_node:
+            h_graph = self.pool(h_node, batched_data.is_att)
+        else:
+            h_graph = self.pool(h_node, batched_data.batch)
 
         if self.max_seq_len is None:
-            return self.graph_pred_linear(h_graph)
+            output =  self.graph_pred_linear(h_graph)
+            if 'pcqm' in self.dataset:
+                if self.training:
+                    return output
+                else:
+                    return torch.clamp(output, min=0, max=20)
+            else:
+                return output
+
         pred_list = []
         for i in range(self.max_seq_len):
             pred_list.append(self.graph_pred_linear_list[i](h_graph))

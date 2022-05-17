@@ -15,10 +15,10 @@ gnn_num_layer: 4
 # max_input_len: 200
 graph_pooling: attention
 gnn_emb_dim: 256
-gat_heads: 4
+gat_heads: 8
 ##
 batch_size: 8
 ##
 gnn_virtual_node: True
 gnn_residual: True
-gnn_expanded: false
+gnn_expanded: True

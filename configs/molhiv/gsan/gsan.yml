@@ -1,0 +1,21 @@
+dataset: ogbg-molhiv
+aug: baseline
+model_type: gnn
+gnn_type: gsan
+gnn_virtual_node: true
+runs: 5
+seed: 12344
+batch_size: 256
+eval_batch_size: 1024
+lr: 0.0005
+start-eval: 1
+scheduler: cosine
+epochs: 30
+
+wandb_run_idx: baseline_0001
+fill_value: 0
+normalizer: tanh
+feature_mlp: false
+gnn_residual: true
+data_tmp: "/data/adnans/tmp"
+data_root: "/data/adnans/ogb"

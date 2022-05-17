@@ -14,6 +14,26 @@ from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
 
 from torch_geometric.nn.inits import glorot, zeros
 
+from typing import Optional, Tuple, Union
+from torch.nn import PReLU, Linear, Sequential, Tanh, ReLU, ELU, BatchNorm1d as BN
+import torch
+import torch.nn.functional as F
+from torch import Tensor
+from torch.nn import Parameter
+from torch_sparse import SparseTensor, set_diag
+import torch.nn as nn
+from torch_geometric.nn.conv import MessagePassing
+from torch.nn import Linear
+from torch_geometric.typing import (
+    Adj,
+    NoneType,
+    OptPairTensor,
+    OptTensor,
+    Size,
+)
+from torch_geometric.utils import  remove_self_loops, softmax
+from torch_scatter import scatter
+from torch_geometric.nn.inits import glorot, zeros
 
 class GATConv(MessagePassing):
     r"""The graph attentional operator from the `"Graph Attention Networks"
@@ -113,6 +133,7 @@ class GATConv(MessagePassing):
         add_self_loops: bool = True,
         edge_dim: Optional[int] = None,
         fill_value: Union[float, Tensor, str] = 'mean',
+        edge_encoder_cls = None,
         bias: bool = True,
         **kwargs,
     ):
@@ -130,7 +151,7 @@ class GATConv(MessagePassing):
         self.fill_value = fill_value
         self.expanded = expanded
         self.rate = rate
-
+        self.edge_encoder = edge_encoder_cls(in_channels)
         # In case we are operating in bipartite graphs, we apply separate
         # transformations 'lin_src' and 'lin_dst' to source and target nodes:
         if isinstance(in_channels, int):
@@ -199,7 +220,7 @@ class GATConv(MessagePassing):
         # `torch.jit._overload` decorator, as we can only change the output
         # arguments conditioned on type (`None` or `bool`), not based on its
         # actual value.
-
+        edge_attr = self.edge_encoder(edge_attr)
         H, C = self.heads, self.out_channels
 
         # We first transform the input node features. If a tuple is passed, we
@@ -222,9 +243,10 @@ class GATConv(MessagePassing):
         alpha_dst = None if x_dst is None else (x_dst * self.att_dst).sum(-1)
         alpha = (alpha_src, alpha_dst)
         
-        edge_attr = None #change for later
+        # edge_attr = None #change for later
         if not self.expanded:
             if self.add_self_loops:
+                # print(edge_index.shape,edge_attr.shape)
                 if isinstance(edge_index, Tensor):
                     # We only want to add self-loops for nodes that appear both as
                     # source and target nodes:
@@ -245,7 +267,9 @@ class GATConv(MessagePassing):
                             "The usage of 'edge_attr' and 'add_self_loops' "
                             "simultaneously is currently not yet supported for "
                             "'edge_index' in a 'SparseTensor' form")
-            out = self.propagate(edge_index, x=x, alpha=alpha, edge_attr=None,
+
+            # print(x[0][0],x[1][0])
+            out = self.propagate(edge_index, x=x, alpha=alpha, edge_attr=edge_attr,
                                  size=size)
         else:
             if self.add_self_loops:
@@ -261,6 +285,9 @@ class GATConv(MessagePassing):
                     edge_index_new, weight = add_self_loops(
                         edge_index_new, weight, fill_value=0.0,
                         num_nodes=num_nodes)
+                    # print("check_after",edge_index_new.shape)
+                    # print(num_nodes,x[0].shape)
+                    # exit()
                 elif isinstance(edge_index_new, SparseTensor):
                     if self.edge_dim is None:
                         edge_index_new = set_diag(edge_index_new)
@@ -316,12 +343,13 @@ class GATConv(MessagePassing):
 #         self._alpha = alpha  # Save for later use.
 #         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 #         return x_j * alpha.unsqueeze(-1)
-    def message(self, x_j: Tensor, alpha_j: Tensor, alpha_i: OptTensor,
+    def message(self, x_j: Tensor, x_i: Tensor, alpha_j: Tensor, alpha_i: OptTensor,
                 edge_attr: OptTensor, index: Tensor, ptr: OptTensor,
                 size_i: Optional[int],weight=None) -> Tensor:
         # Given edge-level attention coefficients for source and target nodes,
         # we simply need to sum them up to "emulate" concatenation:
-
+        
+        # print(x_j[0], x_i[0])
         alpha = alpha_j if alpha_i is None else alpha_j + alpha_i
         # print(index,ptr,edge_attr, size_i,weight)
         # print(x_j.shape,index.shape,weight.shape,alpha_j.shape)
@@ -336,13 +364,51 @@ class GATConv(MessagePassing):
             edge_attr = edge_attr.view(-1, self.heads, self.out_channels)
             alpha_edge = (edge_attr * self.att_edge).sum(dim=-1)
             alpha = alpha + alpha_edge
-
+        
         alpha = F.leaky_relu(alpha, self.negative_slope)
         alpha = softmax(alpha, index, ptr, size_i)
         self._alpha = alpha  # Save for later use.
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
+        # print(x_j.shape,alpha.unsqueeze(-1).shape)
+        # exit()
         return x_j * alpha.unsqueeze(-1)
 
     def __repr__(self) -> str:
         return (f'{self.__class__.__name__}({self.in_channels}, '
                 f'{self.out_channels}, heads={self.heads})')
+
+    
+def add_self_loops(
+        edge_index: Tensor, edge_attr: OptTensor = None,
+        fill_value: Union[float, Tensor, str] = None,
+        num_nodes: Optional[int] = None) -> Tuple[Tensor, OptTensor]:
+
+    N = num_nodes
+
+    loop_index = torch.arange(0, N, dtype=torch.long, device=edge_index.device)
+    loop_index = loop_index.unsqueeze(0).repeat(2, 1)
+
+    if edge_attr is not None:
+        if fill_value is None:
+            loop_attr = edge_attr.new_full((N, ) + edge_attr.size()[1:], 1.)
+
+        elif isinstance(fill_value, (int, float)):
+            loop_attr = edge_attr.new_full((N, ) + edge_attr.size()[1:],
+                                           fill_value)
+        elif isinstance(fill_value, Tensor):
+            loop_attr = fill_value.to(edge_attr.device, edge_attr.dtype)
+            if edge_attr.dim() != loop_attr.dim():
+                loop_attr = loop_attr.unsqueeze(0)
+            sizes = [N] + [1] * (loop_attr.dim() - 1)
+            loop_attr = loop_attr.repeat(*sizes)
+
+        elif isinstance(fill_value, str):
+            loop_attr = scatter(edge_attr, edge_index[1], dim=0, dim_size=N,
+                                reduce=fill_value)
+        else:
+            raise AttributeError("No valid 'fill_value' provided")
+
+        edge_attr = torch.cat([edge_attr, loop_attr], dim=0)
+
+    edge_index = torch.cat([edge_index, loop_index], dim=1)
+    return edge_index, edge_attr

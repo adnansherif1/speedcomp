@@ -2,12 +2,14 @@ import importlib
 import os
 
 from .base_trainer import BaseTrainer
+from .base_trainer_pretrain import BaseTrainerPretrain
 
 TRAINER_REGISTRY = {}
 TRAINER_CLASS_NAMES = set()
 
 __all__ = {
     "BaseTrainer",
+    "BaseTrainerPretrain",
 }
 
 
@@ -33,9 +35,11 @@ def register_trainer(name, dataclass=None):
     """
 
     def register_trainer_cls(cls):
+        print(cls.__name__,name,issubclass(cls, BaseTrainer))
         if name in TRAINER_REGISTRY:
             raise ValueError("Cannot register duplicate task ({})".format(name))
-        if not issubclass(cls, BaseTrainer):
+        if not issubclass(cls, BaseTrainer) and (not issubclass(cls, BaseTrainerPretrain)):
+            # print(issubclass(cls, BaseTrainer),"halelooyah",issubclass(cls, BaseTrainerPretrain))
             raise ValueError("Trainer ({}: {}) must extend BaseTrainer".format(name, cls.__name__))
         if cls.__name__ in TRAINER_CLASS_NAMES:
             raise ValueError("Cannot register task with duplicate class name ({})".format(cls.__name__))

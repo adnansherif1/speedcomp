@@ -1,12 +1,13 @@
-dataset: DD
+dataset: ogbg-molpcba
 aug: baseline
 model_type: gnn
 gnn_type: gin
 gnn_virtual_node: true
-runs: 3
+runs: 1
+batch_size: 256
+gnn_dropout: 0.5
 epochs: 100
-seed: 12344
+lr: 0.001
 scheduler: plateau
-gnn_virtual_attention: true
 data_tmp: "/data/adnans/tmp"
 data_root: "/data/adnans/ogb"

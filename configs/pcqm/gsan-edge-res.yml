@@ -1,0 +1,24 @@
+dataset: ogbg-pcqm
+aug: baseline
+model_type: gnn
+gnn_type: gsanena
+gnn_virtual_node: true
+runs: 1
+
+gnn_dropout: 0.5
+
+
+scheduler: cosine
+data_tmp: "/data/adnans/tmp"
+data_root: "/data/adnans/ogb"
+fill_value: 0.0
+normalizer: tanh
+feature_mlp: true
+gnn_residual: true
+
+warmup_epochs: 0
+lr: 0.0005
+epochs: 150
+batch_size: 256
+gnn_num_layer: 5
+gnn_emb_dim: 256

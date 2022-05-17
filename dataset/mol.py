@@ -33,7 +33,7 @@ class MolUtil:
         return calc_loss
 
     @staticmethod
-    def eval(model, device, loader, evaluator):
+    def eval(model, device, loader, evaluator,accelerator,parallel):
         model.eval()
         y_true = []
         y_pred = []
@@ -80,6 +80,48 @@ class MolUtil:
         logger.debug("Avg num nodes: {}", num_nodes / num_graphs)
         logger.debug("Avg deg: {}", deg)
 
-        node_encoder_cls = lambda: AtomEncoder(model_cls.get_emb_dim(args))
-        edge_encoder_cls = lambda emb_dim: BondEncoder(emb_dim=emb_dim)
+        node_encoder_cls = lambda: AE(model_cls.get_emb_dim(args), args.gnn_att_node)
+        edge_encoder_cls = lambda emb_dim: BE(emb_dim, args.gnn_att_node)
+        # node_encoder_cls = lambda: AtomEncoder(model_cls.get_emb_dim(args))
+        # edge_encoder_cls = lambda emb_dim: BondEncoder(emb_dim)
         return dataset.num_tasks, node_encoder_cls, edge_encoder_cls, deg
+
+
+class AE(torch.nn.Module):
+
+    def __init__(self, emb_dim, att_node):
+        super(AE, self).__init__()
+        self.atom_encoder = AtomEncoder(emb_dim)
+        self.att_node = att_node
+        if self.att_node:
+            self.att_emb = nn.Parameter(torch.randn([emb_dim], requires_grad=True))
+    def forward(self, x):
+        is_att = x[:,0]==-1
+        # print(len(x),x.shape, len(is_att),is_att)
+        # exit()
+        if self.att_node:
+            x = x*(1-is_att.reshape(-1,1).long())
+        out = self.atom_encoder(x)
+        # out = x*(1-is_att.reshape(-1,1))
+        if self.att_node:
+            # out += self.att_emb.repeat(len(out),1)*is_att.reshape((-1,1))
+            out[is_att] = self.att_emb
+        return out
+    
+class BE(torch.nn.Module):
+
+    def __init__(self, emb_dim,att_node):
+        super(BE, self).__init__()
+        self.bond_encoder = BondEncoder(emb_dim)
+        self.att_edge = att_node
+        if self.att_edge:
+            self.att_emb = nn.Parameter(torch.randn([emb_dim], requires_grad=True))
+    def forward(self, x):
+        is_att_edge = x[:,0] == -1
+        if self.att_edge:
+            x = x*(1-is_att_edge.reshape(-1,1).long())
+        out = self.bond_encoder(x)
+        if self.att_edge:
+            out[is_att_edge] = self.att_emb
+        return out
+        

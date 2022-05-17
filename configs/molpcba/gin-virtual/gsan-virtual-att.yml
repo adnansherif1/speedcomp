@@ -1,0 +1,24 @@
+dataset: ogbg-molpcba
+aug: baseline
+model_type: gnn
+gnn_type: gsan
+
+gnn_virtual_node: true
+gnn_att_node: false
+# graph_pooling: cls
+# gnn_num_layer: 6
+gnn_virtual_attention: true
+
+runs: 1
+batch_size: 256
+gnn_dropout: 0.5
+epochs: 100
+lr: 0.0005
+scheduler: cosine
+data_tmp: "/data/adnans/tmp"
+data_root: "/data/adnans/ogb"
+fill_value: 0
+normalizer: sigmoid
+feature_mlp: true
+gnn_residual: true
+# resume: exps/ogbg-molpcba+gnn+gsan-virtual+baseline+lr=0.0005+wd=0.0+sch=cosine+seed1000-05_04-03_43_18/

@@ -1,0 +1,16 @@
+dataset: ogbg-code2
+aug: baseline
+model_type: gnn
+gnn_type: gsan
+gnn_virtual_node: true
+runs: 1
+batch_size: 16
+seed: 12344
+scheduler: cosine
+data_root: "/data/adnans/ogb"
+data_tmp: "/data/adnans/tmp"
+fill_value: 0.0
+normalizer: softmax
+feature_mlp: false
+n_head: 4
+gnn_residual: true
